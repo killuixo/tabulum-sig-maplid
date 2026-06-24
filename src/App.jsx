@@ -3,7 +3,6 @@ import React, { useState, useMemo, useEffect } from 'react';
 // ==========================================
 // 🔗 CONFIGURAÇÃO DE URL SEGURA (VARIÁVEIS DE AMBIENTE)
 // ==========================================
-// Prioriza a sintaxe do Vite (import.meta.env), vital para funcionar no celular pelo Vercel.
 const GOOGLE_SHEETS_WEBAPP_URL = 
   (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_SHEETS_URL) || 
   (typeof process !== 'undefined' && process.env && process.env.REACT_APP_SHEETS_URL) || 
@@ -96,23 +95,21 @@ export default function App() {
   const [selectedContact, setSelectedContact] = useState(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [formData, setFormData] = useState({});
-  const [dialog, setDialog] = useState(null); // Substitui window.confirm e window.alert
+  const [dialog, setDialog] = useState(null); // Substitui window.confirm e alert
   
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [mapScope, setMapScope] = useState('SC');
   
-  // Filtros unificados (Aplicam-se ao Dashboard e ao Diretório)
+  // Filtros unificados
   const [searchTerm, setSearchTerm] = useState('');
   const [filterBase, setFilterBase] = useState('Todas');
   const [filterTemas, setFilterTemas] = useState('Todos');
   const [filterSituacao, setFilterSituacao] = useState('Todas');
   const [filterArticulador, setFilterArticulador] = useState('Todos');
 
-  // Segurança dos Ajustes
   const [isSettingsUnlocked, setIsSettingsUnlocked] = useState(false);
   const [settingsPasswordInput, setSettingsPasswordInput] = useState('');
 
-  // Nuvem / Sheets API
   const [localSyncUrl, setLocalSyncUrl] = useState(() => localStorage.getItem('tabulum_sync_url') || GOOGLE_SHEETS_WEBAPP_URL);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -136,14 +133,14 @@ export default function App() {
 
   const baseCard = `border-[3px] ${t.border} rounded-xl shadow-mondrian transition-all`;
   const mondrianCard = `${baseCard} ${t.cardBg}`;
-  const mondrianButton = `font-bold border-[3px] ${t.border} rounded-xl shadow-mondrian-btn transition-all flex items-center justify-center gap-2 px-6 py-3 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed`;
+  // Modificado: removido w-full da base do botão para flexibilidade nos Grids
+  const mondrianButton = `font-bold border-[3px] ${t.border} rounded-xl shadow-mondrian-btn transition-all flex items-center justify-center gap-2 px-4 py-3 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed`;
 
   const bases = ['Todas', 'Base Florianópolis', 'Base Santa Catarina'];
   const temasExtraidos = ['Todos', ...new Set(contacts.map(c => c.temas).filter(Boolean))].sort();
   const situacoesExtraidas = ['Todas', ...new Set(contacts.map(c => c.situacao).filter(Boolean))].sort();
   const articuladoresExtraidos = ['Todos', ...new Set(contacts.map(c => c.articulador).filter(Boolean))].sort();
 
-  // === FUNÇÕES DA NUVEM (API GOOGLE SHEETS) ===
   const syncWithCloud = async () => {
     if (!localSyncUrl) return;
     setIsLoading(true);
@@ -169,7 +166,6 @@ export default function App() {
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify({ _action: action, ...dataPayload })
       });
-      // Resync to get updated Row IDs from Server
       await syncWithCloud();
     } catch (e) {
       console.error("Erro ao salvar na nuvem:", e);
@@ -183,7 +179,6 @@ export default function App() {
     const isNew = !formData.id;
     const contactToSave = { ...formData };
     
-    // Atualiza State Localmente com ID temporário caso seja novo
     if (isNew) {
       contactToSave.id = "temp_" + Date.now(); 
       setContacts(prev => [...prev, contactToSave]);
@@ -191,9 +186,7 @@ export default function App() {
       setContacts(prev => prev.map(c => String(c.id) === String(contactToSave.id) ? contactToSave : c));
     }
     
-    // Envia para a nuvem
     await saveToCloud('update', contactToSave);
-    
     setSelectedContact(null);
     setIsEditMode(false);
   };
@@ -244,7 +237,6 @@ export default function App() {
     }
   };
 
-  // Aplica todos os filtros selecionados para a visualização no Diretório
   const filteredContacts = useMemo(() => {
     return contacts.filter(contact => {
       const nomeMatch = contact.lideranca?.toLowerCase().includes(searchTerm.toLowerCase());
@@ -261,7 +253,6 @@ export default function App() {
     });
   }, [contacts, searchTerm, filterBase, filterTemas, filterSituacao, filterArticulador]);
 
-  // Contatos utilizados exclusivamente para o Dashboard (obedece o filtro de Articulador)
   const dashboardContacts = useMemo(() => {
     if (filterArticulador === 'Todos') return contacts;
     return contacts.filter(c => c.articulador === filterArticulador);
@@ -293,19 +284,19 @@ export default function App() {
     const maxCount = Math.max(1, ...Object.values(heatPoints).map(p => p.count));
 
     return (
-      <div className={`${baseCard} bg-[#1A1A1A] p-4 flex flex-col md:col-span-3 text-[#F4F4F0] overflow-hidden`}>
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
-          <h3 className="text-2xl font-bold flex items-center gap-2">
-            <Icon name="map" size={28} className="text-[#DCAE1D]" /> 
-            Densidade Territorial: {mapScope === 'SC' ? 'Santa Catarina' : 'Florianópolis'}
+      <div className={`${baseCard} bg-[#1A1A1A] p-4 md:p-6 flex flex-col lg:col-span-3 text-[#F4F4F0] overflow-hidden`}>
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+          <h3 className="text-xl md:text-2xl font-bold flex items-center gap-2 w-full md:w-auto">
+            <Icon name="map" size={28} className="text-[#DCAE1D] shrink-0" /> 
+            <span className="truncate">Densidade: {mapScope === 'SC' ? 'Santa Catarina' : 'Floripa'}</span>
           </h3>
-          <div className="flex border-[3px] border-[#F4F4F0] rounded-lg overflow-hidden shrink-0">
-            <button onClick={() => setMapScope('SC')} className={`px-4 py-2 font-bold transition-colors ${mapScope === 'SC' ? 'bg-[#DCAE1D] text-[#1A1A1A]' : 'bg-transparent text-[#F4F4F0] hover:bg-gray-800'}`}>SC</button>
+          <div className="flex border-[3px] border-[#F4F4F0] rounded-lg overflow-hidden shrink-0 w-full md:w-auto">
+            <button onClick={() => setMapScope('SC')} className={`flex-1 px-4 py-2 font-bold transition-colors ${mapScope === 'SC' ? 'bg-[#DCAE1D] text-[#1A1A1A]' : 'bg-transparent text-[#F4F4F0] hover:bg-gray-800'}`}>SC</button>
             <div className="w-[3px] bg-[#F4F4F0]"></div>
-            <button onClick={() => setMapScope('FLN')} className={`px-4 py-2 font-bold transition-colors ${mapScope === 'FLN' ? 'bg-[#007577] text-white' : 'bg-transparent text-[#F4F4F0] hover:bg-gray-800'}`}>Floripa</button>
+            <button onClick={() => setMapScope('FLN')} className={`flex-1 px-4 py-2 font-bold transition-colors ${mapScope === 'FLN' ? 'bg-[#007577] text-white' : 'bg-transparent text-[#F4F4F0] hover:bg-gray-800'}`}>Floripa</button>
           </div>
         </div>
-        <div className={`relative w-full ${mapScope === 'SC' ? 'aspect-video max-h-[500px]' : 'aspect-[3/4] max-h-[600px] max-w-[400px] mx-auto'} bg-[#2A2A2A] rounded-lg border-2 border-gray-700 overflow-hidden`}>
+        <div className={`relative w-full ${mapScope === 'SC' ? 'aspect-video max-h-[500px]' : 'aspect-[3/4] max-h-[500px] max-w-[400px] mx-auto'} bg-[#2A2A2A] rounded-lg border-2 border-gray-700 overflow-hidden`}>
           <svg className="absolute inset-0 w-full h-full opacity-30 pointer-events-none" preserveAspectRatio="none" viewBox="0 0 100 100">
             {mapScope === 'SC' ? (
               <polygon points="5,45 35,30 65,20 85,10 95,40 98,55 90,85 75,95 55,75 25,65 5,60" fill="#007577" stroke="#F4F4F0" strokeWidth="1" strokeLinejoin="round" />
@@ -325,7 +316,7 @@ export default function App() {
               <div key={i} className="absolute flex items-center justify-center transform -translate-x-1/2 -translate-y-1/2 group cursor-crosshair" style={{ top: `${pt.y}%`, left: `${pt.x}%`, width: size, height: size }}>
                 <div className="absolute inset-0 rounded-full animate-pulse" style={{ backgroundColor: color, opacity: opacity * 0.5 }}></div>
                 <div className="absolute inset-2 rounded-full border-2 border-white shadow-[0_0_10px_rgba(0,0,0,0.5)]" style={{ backgroundColor: color, opacity: opacity }}></div>
-                <div className="absolute top-full mt-2 w-max bg-[#F4F4F0] text-[#1A1A1A] text-xs font-bold px-2 py-1 rounded border-2 border-[#1A1A1A] opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-none shadow-md">
+                <div className="absolute top-full mt-2 w-max max-w-[150px] bg-[#F4F4F0] text-[#1A1A1A] text-xs font-bold px-2 py-1 rounded border-2 border-[#1A1A1A] opacity-0 group-hover:opacity-100 transition-opacity z-10 shadow-md">
                   {pt.label}: {pt.count} contatos
                 </div>
               </div>
@@ -342,50 +333,51 @@ export default function App() {
     if (situacao.includes("4 -")) cor = "bg-[#007577] text-white";
     else if (situacao.includes("3 -")) cor = "bg-[#DCAE1D] text-[#1A1A1A]";
     else if (situacao.includes("1 -")) cor = "bg-[#B32033] text-white";
-    return <span className={`px-2 py-1 text-xs font-bold rounded-md border-2 ${t.border} ${cor}`}>{situacao}</span>;
+    return <span className={`px-2 py-1 text-xs font-bold rounded-md border-2 ${t.border} ${cor} truncate max-w-full block`}>{situacao}</span>;
   };
 
   const renderDashboard = () => (
     <div className="space-y-6 animation-fade-in">
       
-      {/* BARRA DE FILTRO DE ARTICULADOR DO DASHBOARD */}
-      <div className={`p-4 rounded-xl border-[3px] ${t.border} ${t.cardBg} flex flex-col md:flex-row justify-between items-center gap-4 shadow-mondrian`}>
-        <h2 className={`text-xl font-black ${t.text} flex items-center gap-2`}>
+      <div className={`p-4 md:p-6 rounded-xl border-[3px] ${t.border} ${t.cardBg} flex flex-col lg:flex-row justify-between items-stretch lg:items-center gap-4 shadow-mondrian`}>
+        <h2 className={`text-xl md:text-2xl font-black ${t.text} flex items-center gap-2 shrink-0`}>
           <Icon name="dashboard" /> Visão Geral
         </h2>
-        <div className="flex items-center gap-3 w-full md:w-auto">
-          <label className={`font-bold ${t.textMuted} text-sm whitespace-nowrap`}>Filtrar Articulador:</label>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 w-full lg:w-auto">
+          <label className={`font-bold ${t.textMuted} text-sm shrink-0`}>Filtrar Articulador:</label>
           <select 
             value={filterArticulador} 
             onChange={(e) => setFilterArticulador(e.target.value)} 
-            className={`w-full md:w-48 px-3 py-2 rounded-lg border-2 ${t.border} font-medium ${t.inputBg} ${t.text}`}
+            className={`w-full sm:w-56 px-3 py-2 rounded-lg border-2 ${t.border} font-medium ${t.inputBg} ${t.text} truncate`}
           >
             {articuladoresExtraidos.map(a => <option key={a} value={a}>{a}</option>)}
           </select>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className={`${mondrianCard} p-6 flex flex-col justify-between overflow-hidden relative`}>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className={`${mondrianCard} p-6 flex flex-col justify-between overflow-hidden relative sm:col-span-2 lg:col-span-1`}>
           <div className={`absolute top-0 right-0 w-16 h-16 bg-[#B32033] border-l-[3px] border-b-[3px] ${t.border} rounded-bl-xl`}></div>
           <h3 className={`text-xl font-bold mb-2 relative z-10 ${t.text}`}>Total de Lideranças</h3>
           <p className={`text-6xl font-black relative z-10 ${t.text}`}>{stats.total}</p>
         </div>
         <div className={`${baseCard} bg-[#007577] text-white p-6 flex flex-col justify-between`}>
-          <h3 className="text-xl font-bold mb-2 flex items-center gap-2"><Icon name="mappin" /> Base Florianópolis</h3>
+          <h3 className="text-xl font-bold mb-2 flex items-center gap-2"><Icon name="mappin" /> Florianópolis</h3>
           <p className="text-5xl font-black">{stats.floripaCount}</p>
         </div>
         <div className={`${baseCard} bg-[#DCAE1D] text-[#1A1A1A] p-6 flex flex-col justify-between`}>
-          <h3 className="text-xl font-bold mb-2 flex items-center gap-2"><Icon name="mappin" /> Base Santa Catarina</h3>
+          <h3 className="text-xl font-bold mb-2 flex items-center gap-2"><Icon name="mappin" /> Santa Catarina</h3>
           <p className="text-5xl font-black">{stats.scCount}</p>
         </div>
+        
         {renderHeatMap()}
-        <div className={`${mondrianCard} p-6 md:col-span-3`}>
-          <h3 className={`text-2xl font-bold mb-6 border-b-[3px] ${t.border} pb-2 flex items-center gap-2 ${t.text}`}>
+        
+        <div className={`${mondrianCard} p-6 lg:col-span-3`}>
+          <h3 className={`text-xl md:text-2xl font-bold mb-6 border-b-[3px] ${t.border} pb-2 flex items-center gap-2 ${t.text}`}>
             <Icon name="barchart" /> Principais Temas
           </h3>
           {stats.topTemas.length > 0 ? (
-            <div className="space-y-4 max-w-3xl">
+            <div className="space-y-4 max-w-full lg:max-w-3xl">
               {stats.topTemas.map(([nome, count], index) => {
                 const max = Math.max(...stats.topTemas.map(t => t[1]));
                 const percentage = (count / max) * 100;
@@ -393,7 +385,8 @@ export default function App() {
                 return (
                   <div key={nome}>
                     <div className={`flex justify-between text-sm font-bold mb-1 ${t.text}`}>
-                      <span>{nome}</span><span>{count} contatos</span>
+                      <span className="truncate pr-4">{nome}</span>
+                      <span className="shrink-0">{count} conts.</span>
                     </div>
                     <div className={`h-4 w-full ${t.inputBgAlt} rounded-full border-2 ${t.border} overflow-hidden`}>
                       <div className={`h-full ${colors[index % colors.length]} transition-all duration-1000 border-r-2 ${t.border}`} style={{ width: `${percentage}%` }}></div>
@@ -412,70 +405,71 @@ export default function App() {
 
   const renderDirectory = () => (
     <div className="space-y-6 animation-fade-in">
-      <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-        <h2 className={`text-2xl font-black flex items-center gap-2 ${t.text}`}><Icon name="directory"/> Diretório Base</h2>
-        <button onClick={openNewContactModal} className={`${mondrianButton} bg-[#007577] text-white hover:-translate-y-1`}>
+      <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4">
+        <h2 className={`text-xl md:text-2xl font-black flex items-center gap-2 ${t.text}`}><Icon name="directory"/> Diretório Base</h2>
+        <button onClick={openNewContactModal} className={`${mondrianButton} bg-[#007577] text-white hover:-translate-y-1 w-full sm:w-auto`}>
           <Icon name="plus" size={20} /> Adicionar
         </button>
       </div>
 
-      <div className={`${mondrianCard} p-4 md:p-6 bg-[#DCAE1D] flex flex-col md:flex-row gap-4 items-end flex-wrap`}>
+      <div className={`${mondrianCard} p-4 md:p-6 bg-[#DCAE1D] flex flex-col md:flex-row gap-4 items-stretch md:items-end flex-wrap`}>
         <div className="w-full md:flex-1 min-w-[200px] flex flex-col gap-2">
-          <label className="font-bold text-[#1A1A1A]">Buscar</label>
+          <label className="font-bold text-[#1A1A1A] text-sm md:text-base">Buscar</label>
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-500"><Icon name="search" size={20} /></div>
-            <input type="text" placeholder="Nome, área, município..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className={`w-full pl-10 pr-3 py-3 rounded-lg border-[3px] ${t.border} focus:outline-none focus:ring-2 focus:ring-[#B32033] font-medium ${t.inputBg} ${t.text}`} />
+            <input type="text" placeholder="Nome, área, local..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className={`w-full pl-10 pr-3 py-3 rounded-lg border-[3px] ${t.border} focus:outline-none focus:ring-2 focus:ring-[#B32033] font-medium ${t.inputBg} ${t.text}`} />
           </div>
         </div>
-        <div className="w-full md:w-40 flex flex-col gap-2">
-          <label className="font-bold text-[#1A1A1A]">Base</label>
-          <select value={filterBase} onChange={(e) => setFilterBase(e.target.value)} className={`w-full px-3 py-3 rounded-lg border-[3px] ${t.border} font-medium ${t.inputBg} ${t.text}`}>
+        <div className="w-full sm:w-[calc(50%-0.5rem)] md:w-40 flex flex-col gap-2">
+          <label className="font-bold text-[#1A1A1A] text-sm md:text-base">Base</label>
+          <select value={filterBase} onChange={(e) => setFilterBase(e.target.value)} className={`w-full px-3 py-3 rounded-lg border-[3px] ${t.border} font-medium ${t.inputBg} ${t.text} truncate`}>
             {bases.map(b => <option key={b} value={b}>{b}</option>)}
           </select>
         </div>
-        <div className="w-full md:w-40 flex flex-col gap-2">
-          <label className="font-bold text-[#1A1A1A]">Tema</label>
+        <div className="w-full sm:w-[calc(50%-0.5rem)] md:w-40 flex flex-col gap-2">
+          <label className="font-bold text-[#1A1A1A] text-sm md:text-base">Tema</label>
           <select value={filterTemas} onChange={(e) => setFilterTemas(e.target.value)} className={`w-full px-3 py-3 rounded-lg border-[3px] ${t.border} font-medium ${t.inputBg} ${t.text} truncate`}>
             {temasExtraidos.map(a => <option key={a} value={a}>{a}</option>)}
           </select>
         </div>
-        <div className="w-full md:w-40 flex flex-col gap-2">
-          <label className="font-bold text-[#1A1A1A]">Situação</label>
+        <div className="w-full sm:w-[calc(50%-0.5rem)] md:w-40 flex flex-col gap-2">
+          <label className="font-bold text-[#1A1A1A] text-sm md:text-base">Situação</label>
           <select value={filterSituacao} onChange={(e) => setFilterSituacao(e.target.value)} className={`w-full px-3 py-3 rounded-lg border-[3px] ${t.border} font-medium ${t.inputBg} ${t.text} truncate`}>
             {situacoesExtraidas.map(a => <option key={a} value={a}>{a}</option>)}
           </select>
         </div>
-        <div className="w-full md:w-40 flex flex-col gap-2">
-          <label className="font-bold text-[#1A1A1A]">Articulador</label>
+        <div className="w-full sm:w-[calc(50%-0.5rem)] md:w-40 flex flex-col gap-2">
+          <label className="font-bold text-[#1A1A1A] text-sm md:text-base">Articulador</label>
           <select value={filterArticulador} onChange={(e) => setFilterArticulador(e.target.value)} className={`w-full px-3 py-3 rounded-lg border-[3px] ${t.border} font-medium ${t.inputBg} ${t.text} truncate`}>
             {articuladoresExtraidos.map(a => <option key={a} value={a}>{a}</option>)}
           </select>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredContacts.map(contact => (
           <div key={contact.id} onClick={() => { setSelectedContact(contact); setIsEditMode(false); }} className={`${mondrianCard} hover:-translate-y-1 hover:shadow-mondrian-btn cursor-pointer flex flex-col h-full`}>
             <div className={`h-3 w-full border-b-[3px] ${t.border} ${contact.base.includes('Florianópolis') ? 'bg-[#007577]' : 'bg-[#DCAE1D]'}`}></div>
-            <div className="p-5 flex-grow flex flex-col gap-3">
+            <div className="p-4 md:p-5 flex-grow flex flex-col gap-3">
               <div>
-                <h3 className={`text-xl font-bold leading-tight mb-1 line-clamp-2 ${t.text}`}>{contact.lideranca}</h3>
-                <div className={`flex items-center text-sm font-semibold gap-1 mb-2 ${t.textMuted}`}>
-                  <span className="text-[#B32033]"><Icon name="mappin" size={14} /></span> {contact.municipio_bairro} {contact.distrito ? `- ${contact.distrito}` : ''}
+                <h3 className={`text-lg md:text-xl font-bold leading-tight mb-1 line-clamp-2 ${t.text}`}>{contact.lideranca}</h3>
+                <div className={`flex items-start text-xs md:text-sm font-semibold gap-1 mb-2 ${t.textMuted}`}>
+                  <span className="text-[#B32033] mt-0.5 shrink-0"><Icon name="mappin" size={14} /></span> 
+                  <span className="line-clamp-2">{contact.municipio_bairro} {contact.distrito ? `- ${contact.distrito}` : ''}</span>
                 </div>
                 <SituacaoBadge situacao={contact.situacao} />
               </div>
               <div className={`mt-auto pt-4 border-t-2 border-dashed ${isDarkMode ? 'border-gray-700' : 'border-gray-300'} flex flex-wrap gap-2 items-center justify-between`}>
-                <span className={`text-xs font-bold truncate ${t.textMuted}`}><Icon name="tag" size={12} className="inline mr-1"/>{contact.temas || 'S/ Tema'}</span>
-                <button className={`p-2 ${t.inputBgAlt} border-2 ${t.border} rounded-md hover:bg-[#B32033] hover:text-white transition-colors ${t.text}`}><Icon name="chevronright" size={18} /></button>
+                <span className={`text-xs font-bold truncate max-w-[70%] ${t.textMuted}`}><Icon name="tag" size={12} className="inline mr-1"/>{contact.temas || 'S/ Tema'}</span>
+                <button className={`p-2 ${t.inputBgAlt} border-2 ${t.border} rounded-md hover:bg-[#B32033] hover:text-white transition-colors shrink-0 ${t.text}`}><Icon name="chevronright" size={18} /></button>
               </div>
             </div>
           </div>
         ))}
         {filteredContacts.length === 0 && (
-          <div className={`col-span-full py-12 text-center border-[3px] border-dashed ${t.border} rounded-xl ${t.cardBg}`}>
+          <div className={`col-span-full py-12 px-4 text-center border-[3px] border-dashed ${t.border} rounded-xl ${t.cardBg}`}>
             <Icon name="alert" size={48} className="mx-auto mb-4 text-[#B32033]" />
-            <h3 className={`text-2xl font-bold ${t.text}`}>Nenhum contato encontrado</h3>
+            <h3 className={`text-xl md:text-2xl font-bold ${t.text}`}>Nenhum contato encontrado</h3>
           </div>
         )}
       </div>
@@ -483,16 +477,15 @@ export default function App() {
   );
 
   const renderSettings = () => {
-    // TELA DE LOGIN PARA OS AJUSTES
     if (!isSettingsUnlocked) {
       return (
-        <div className="space-y-6 animation-fade-in max-w-md mx-auto mt-12">
-          <div className={`${mondrianCard} p-8 text-center`}>
+        <div className="space-y-6 animation-fade-in w-full max-w-md mx-auto mt-6 md:mt-12 px-2">
+          <div className={`${mondrianCard} p-6 md:p-8 text-center`}>
             <div className="w-16 h-16 mx-auto bg-[#B32033] rounded-full border-[3px] border-[#1A1A1A] flex items-center justify-center text-white mb-6">
               <Icon name="lock" size={32} />
             </div>
-            <h2 className={`text-2xl font-black mb-2 ${t.text}`}>Área Restrita</h2>
-            <p className={`mb-6 text-sm ${t.textMuted}`}>Insira a senha de administrador para acessar as configurações do sistema.</p>
+            <h2 className={`text-xl md:text-2xl font-black mb-2 ${t.text}`}>Área Restrita</h2>
+            <p className={`mb-6 text-sm ${t.textMuted}`}>Insira a senha de administrador para acessar as configurações.</p>
             
             <form onSubmit={handleSettingsLogin} className="flex flex-col gap-4">
               <input 
@@ -501,7 +494,6 @@ export default function App() {
                 onChange={(e) => setSettingsPasswordInput(e.target.value)}
                 placeholder="Senha" 
                 className={`w-full px-4 py-3 rounded-lg border-[3px] ${t.border} font-medium ${t.inputBg} ${t.text} text-center tracking-widest focus:outline-none focus:ring-2 focus:ring-[#B32033]`}
-                autoFocus
               />
               <button type="submit" className={`${mondrianButton} bg-[#1A1A1A] text-white w-full hover:bg-gray-800`}>
                 Desbloquear
@@ -512,30 +504,28 @@ export default function App() {
       );
     }
 
-    // TELA DE AJUSTES DESBLOQUEADA
     return (
-      <div className="space-y-6 animation-fade-in max-w-4xl mx-auto">
-        <div className={`${mondrianCard} p-8 relative`}>
+      <div className="space-y-6 animation-fade-in w-full max-w-4xl mx-auto">
+        <div className={`${mondrianCard} p-4 md:p-8 relative`}>
           <button 
             onClick={() => setIsSettingsUnlocked(false)} 
-            className="absolute top-8 right-8 text-[#B32033] hover:text-red-700 flex items-center gap-2 font-bold text-sm"
+            className="absolute top-4 right-4 md:top-8 md:right-8 text-[#B32033] hover:text-red-700 flex items-center gap-2 font-bold text-sm"
           >
-            <Icon name="lock" size={16} /> Bloquear Sessão
+            <Icon name="lock" size={16} /><span className="hidden sm:inline">Bloquear Sessão</span>
           </button>
 
-          <h2 className={`text-3xl font-black mb-8 border-b-[3px] ${t.border} pb-4 flex items-center gap-3 ${t.text}`}>
+          <h2 className={`text-2xl md:text-3xl font-black mb-6 md:mb-8 border-b-[3px] ${t.border} pb-4 pr-10 flex items-center gap-3 ${t.text}`}>
             <span className="text-[#B32033]"><Icon name="settings" size={32} /></span> Ajustes
           </h2>
 
-          <div className={`mb-10 p-6 border-[3px] ${t.border} rounded-xl ${t.inputBgAlt}`}>
-            <h3 className={`text-xl font-bold mb-4 flex items-center gap-2 ${t.text}`}>
+          <div className={`mb-8 md:mb-10 p-4 md:p-6 border-[3px] ${t.border} rounded-xl ${t.inputBgAlt}`}>
+            <h3 className={`text-lg md:text-xl font-bold mb-4 flex items-center gap-2 ${t.text}`}>
                <Icon name="refresh" size={24} className="text-[#007577]" /> Sincronização Google Sheets
             </h3>
-            <p className={`mb-4 text-sm font-medium ${t.textMuted}`}>
-              A URL primária está sendo puxada de forma segura através das Variáveis de Ambiente do servidor. <br/>
-              Abaixo, você pode forçar a sincronização ou testar temporariamente outra URL.
+            <p className={`mb-4 text-xs md:text-sm font-medium ${t.textMuted}`}>
+              A URL primária está sendo puxada de forma segura através das Variáveis de Ambiente do servidor. Abaixo, você pode testar temporariamente outra URL.
             </p>
-            <div className="flex flex-col md:flex-row gap-4 mb-4">
+            <div className="flex flex-col sm:flex-row gap-3 mb-2">
               <input 
                 type="text" 
                 value={localSyncUrl} 
@@ -544,10 +534,10 @@ export default function App() {
                   localStorage.setItem('tabulum_sync_url', e.target.value);
                 }}
                 placeholder="https://script.google.com/macros/s/..." 
-                className={`flex-grow px-4 py-3 rounded-lg border-[3px] ${t.border} font-medium ${t.inputBg} ${t.text} focus:outline-none focus:ring-2 focus:ring-[#B32033]`}
+                className={`w-full px-4 py-3 rounded-lg border-[3px] ${t.border} font-medium ${t.inputBg} ${t.text} focus:outline-none focus:ring-2 focus:ring-[#B32033]`}
               />
-              <button onClick={syncWithCloud} disabled={isLoading || !localSyncUrl} className={`${mondrianButton} bg-[#007577] text-white shrink-0`}>
-                <Icon name="refresh" size={20} className={isLoading ? "animate-spin" : ""} /> {isLoading ? 'Aguarde...' : 'Sincronizar Agora'}
+              <button onClick={syncWithCloud} disabled={isLoading || !localSyncUrl} className={`${mondrianButton} bg-[#007577] text-white w-full sm:w-auto shrink-0`}>
+                <Icon name="refresh" size={20} className={isLoading ? "animate-spin" : ""} /> {isLoading ? 'Aguarde' : 'Sincronizar'}
               </button>
             </div>
             {(!localSyncUrl) && (
@@ -555,9 +545,9 @@ export default function App() {
             )}
           </div>
 
-          <div className={`mb-10 p-6 border-[3px] ${t.border} rounded-xl ${t.inputBgAlt}`}>
-            <h3 className={`text-xl font-bold mb-4 ${t.text}`}>Aparência</h3>
-            <button onClick={() => setIsDarkMode(!isDarkMode)} className={`${mondrianButton} ${t.cardBg} ${t.text} w-full md:w-auto`}>
+          <div className={`p-4 md:p-6 border-[3px] ${t.border} rounded-xl ${t.inputBgAlt}`}>
+            <h3 className={`text-lg md:text-xl font-bold mb-4 ${t.text}`}>Aparência</h3>
+            <button onClick={() => setIsDarkMode(!isDarkMode)} className={`${mondrianButton} ${t.cardBg} ${t.text} w-full sm:w-auto`}>
               {isDarkMode ? <span className="text-[#DCAE1D]"><Icon name="sun" size={20} /></span> : <span className="text-[#007577]"><Icon name="moon" size={20} /></span>}
               Alternar para Tema {isDarkMode ? 'Claro' : 'Escuro'}
             </button>
@@ -570,175 +560,173 @@ export default function App() {
   const renderModal = () => {
     if (!selectedContact) return null;
 
-    const inputClasses = `w-full px-3 py-2 mt-1 rounded border-2 ${t.border} font-medium ${t.inputBg} ${t.text} focus:outline-none focus:ring-2 focus:ring-[#B32033]`;
+    const inputClasses = `w-full px-3 py-2 mt-1 rounded border-2 ${t.border} font-medium ${t.inputBg} ${t.text} text-sm focus:outline-none focus:ring-2 focus:ring-[#B32033]`;
 
     return (
-      <div className="fixed inset-0 z-[50] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animation-fade-in">
-        <div className={`${mondrianCard} w-full max-w-3xl max-h-[90vh] overflow-y-auto relative flex flex-col md:flex-row`}>
+      <div className="fixed inset-0 z-[50] flex items-center justify-center p-2 sm:p-4 bg-black/70 backdrop-blur-sm animation-fade-in">
+        <div className={`${mondrianCard} w-full max-w-3xl max-h-[95vh] overflow-y-auto relative flex flex-col md:flex-row`}>
           <div className={`hidden md:block w-8 border-r-[3px] ${t.border} ${isEditMode ? 'bg-[#DCAE1D]' : 'bg-[#B32033]'} flex-shrink-0 transition-colors`}></div>
-          <div className="flex-grow p-6 md:p-8">
+          <div className="flex-grow p-4 md:p-8">
             
-            <div className="flex justify-between items-start mb-6">
-              <div>
+            <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-6">
+              <div className="w-full">
                 {isEditMode ? (
-                  <h2 className={`text-2xl font-black flex items-center gap-2 ${t.text}`}><Icon name="edit"/> {formData.id ? 'Editar Contato' : 'Novo Contato'}</h2>
+                  <h2 className={`text-xl md:text-2xl font-black flex items-center gap-2 ${t.text}`}><Icon name="edit"/> {formData.id ? 'Editar Contato' : 'Novo Contato'}</h2>
                 ) : (
                   <>
-                    <h2 className={`text-3xl font-black mb-2 pr-12 ${t.text}`}>{selectedContact.lideranca}</h2>
+                    <h2 className={`text-2xl md:text-3xl font-black mb-2 ${t.text} pr-12 sm:pr-0 leading-tight`}>{selectedContact.lideranca}</h2>
                     <div className="flex gap-2 flex-wrap mt-2">
-                      <div className={`flex items-center gap-2 font-bold ${t.textMuted} ${t.inputBgAlt} w-fit px-3 py-1 rounded-md border-2 ${t.border}`}>
-                        <Icon name="tag" size={16} /> {selectedContact.base}
+                      <div className={`flex items-center gap-2 font-bold ${t.textMuted} ${t.inputBgAlt} w-fit px-3 py-1 rounded-md border-2 ${t.border} text-xs md:text-sm`}>
+                        <Icon name="tag" size={14} /> {selectedContact.base}
                       </div>
                       <SituacaoBadge situacao={selectedContact.situacao} />
                     </div>
                   </>
                 )}
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 shrink-0 absolute top-4 right-4 sm:relative sm:top-auto sm:right-auto">
                 {!isEditMode && !selectedContact.isNew && (
                   <button onClick={() => openEditModal(selectedContact)} className={`p-2 border-[3px] ${t.border} rounded-xl hover:bg-[#DCAE1D] transition-colors shadow-mondrian-btn ${t.text}`} title="Editar">
-                    <Icon name="edit" size={24} />
+                    <Icon name="edit" size={20} />
                   </button>
                 )}
                 <button onClick={() => { setSelectedContact(null); setIsEditMode(false); }} className={`p-2 border-[3px] ${t.border} rounded-xl hover:bg-[#B32033] hover:text-white transition-colors shadow-mondrian-btn ${t.text}`} title="Fechar">
-                  <Icon name="x" size={24} />
+                  <Icon name="x" size={20} />
                 </button>
               </div>
             </div>
 
             {isEditMode ? (
-              // MODO EDIÇÃO (Mapeado exatamente para o seu CSV)
               <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
                   <div>
-                    <label className={`text-xs font-bold uppercase ${t.textMuted}`}>Liderança (Nome) *</label>
+                    <label className={`text-[10px] md:text-xs font-bold uppercase ${t.textMuted}`}>Liderança (Nome) *</label>
                     <input type="text" name="lideranca" value={formData.lideranca || ''} onChange={handleFormChange} className={inputClasses} required />
                   </div>
                   <div>
-                    <label className={`text-xs font-bold uppercase ${t.textMuted}`}>Aba / Base *</label>
+                    <label className={`text-[10px] md:text-xs font-bold uppercase ${t.textMuted}`}>Aba / Base *</label>
                     <select name="base" value={formData.base || 'Base Florianópolis'} onChange={handleFormChange} className={inputClasses}>
                       <option value="Base Florianópolis">Base Florianópolis</option>
                       <option value="Base Santa Catarina">Base Santa Catarina</option>
                     </select>
                   </div>
                   <div>
-                    <label className={`text-xs font-bold uppercase ${t.textMuted}`}>Município / Bairro</label>
+                    <label className={`text-[10px] md:text-xs font-bold uppercase ${t.textMuted}`}>Município / Bairro</label>
                     <input type="text" name="municipio_bairro" value={formData.municipio_bairro || ''} onChange={handleFormChange} className={inputClasses} />
                   </div>
                   <div>
-                    <label className={`text-xs font-bold uppercase ${t.textMuted}`}>Região</label>
+                    <label className={`text-[10px] md:text-xs font-bold uppercase ${t.textMuted}`}>Região</label>
                     <input type="text" name="regiao" value={formData.regiao || ''} onChange={handleFormChange} className={inputClasses} />
                   </div>
                   {formData.base === 'Base Florianópolis' && (
                     <div>
-                      <label className={`text-xs font-bold uppercase ${t.textMuted}`}>Distrito (Só Floripa)</label>
+                      <label className={`text-[10px] md:text-xs font-bold uppercase ${t.textMuted}`}>Distrito (Só Floripa)</label>
                       <input type="text" name="distrito" value={formData.distrito || ''} onChange={handleFormChange} className={inputClasses} />
                     </div>
                   )}
                   <div>
-                    <label className={`text-xs font-bold uppercase ${t.textMuted}`}>Situação</label>
+                    <label className={`text-[10px] md:text-xs font-bold uppercase ${t.textMuted}`}>Situação</label>
                     <input type="text" name="situacao" value={formData.situacao || ''} onChange={handleFormChange} placeholder="Ex: 4 - Comprometido" className={inputClasses} />
                   </div>
-                  <div className="md:col-span-2">
-                    <label className={`text-xs font-bold uppercase ${t.textMuted}`}>Área de Atuação Livre</label>
+                  <div className="sm:col-span-2">
+                    <label className={`text-[10px] md:text-xs font-bold uppercase ${t.textMuted}`}>Área de Atuação Livre</label>
                     <input type="text" name="area_de_atuacao" value={formData.area_de_atuacao || ''} onChange={handleFormChange} className={inputClasses} />
                   </div>
                   <div>
-                    <label className={`text-xs font-bold uppercase ${t.textMuted}`}>Temas</label>
+                    <label className={`text-[10px] md:text-xs font-bold uppercase ${t.textMuted}`}>Temas</label>
                     <input type="text" name="temas" value={formData.temas || ''} onChange={handleFormChange} className={inputClasses} />
                   </div>
                   <div>
-                    <label className={`text-xs font-bold uppercase ${t.textMuted}`}>Tema Institucional</label>
+                    <label className={`text-[10px] md:text-xs font-bold uppercase ${t.textMuted}`}>Tema Institucional</label>
                     <input type="text" name="tema_institucional" value={formData.tema_institucional || ''} onChange={handleFormChange} className={inputClasses} />
                   </div>
                   <div>
-                    <label className={`text-xs font-bold uppercase ${t.textMuted}`}>Articulador</label>
+                    <label className={`text-[10px] md:text-xs font-bold uppercase ${t.textMuted}`}>Articulador</label>
                     <input type="text" name="articulador" value={formData.articulador || ''} onChange={handleFormChange} className={inputClasses} />
                   </div>
                   <div>
-                    <label className={`text-xs font-bold uppercase ${t.textMuted}`}>Telefone</label>
+                    <label className={`text-[10px] md:text-xs font-bold uppercase ${t.textMuted}`}>Telefone</label>
                     <input type="text" name="telefone" value={formData.telefone || ''} onChange={handleFormChange} className={inputClasses} />
                   </div>
-                  <div className="md:col-span-2">
-                    <label className={`text-xs font-bold uppercase ${t.textMuted}`}>E-mail</label>
+                  <div className="sm:col-span-2">
+                    <label className={`text-[10px] md:text-xs font-bold uppercase ${t.textMuted}`}>E-mail</label>
                     <input type="email" name="email" value={formData.email || ''} onChange={handleFormChange} className={inputClasses} />
                   </div>
                 </div>
                 <div>
-                  <label className={`text-xs font-bold uppercase ${t.textMuted}`}>Observações</label>
+                  <label className={`text-[10px] md:text-xs font-bold uppercase ${t.textMuted}`}>Observações</label>
                   <textarea name="observacoes" value={formData.observacoes || ''} onChange={handleFormChange} rows="3" className={inputClasses}></textarea>
                 </div>
 
-                <div className={`mt-6 pt-6 border-t-[3px] ${t.border} flex flex-col md:flex-row justify-between gap-4`}>
+                <div className={`mt-6 pt-6 border-t-[3px] ${t.border} flex flex-col sm:flex-row justify-between gap-3 sm:gap-4`}>
                   {formData.id && (
-                    <button onClick={() => handleDeleteContact(formData.id)} disabled={isLoading} className={`${mondrianButton} bg-[#B32033] text-white w-full md:w-auto`}>
-                      <Icon name="trash" size={20} /> Excluir
+                    <button onClick={() => handleDeleteContact(formData.id)} disabled={isLoading} className={`${mondrianButton} bg-[#B32033] text-white w-full sm:w-auto order-last sm:order-first`}>
+                      <Icon name="trash" size={20} /> <span className="hidden sm:inline">Excluir</span>
                     </button>
                   )}
-                  <div className="flex gap-4 ml-auto w-full md:w-auto">
-                    <button onClick={() => { setIsEditMode(false); if(!formData.id) setSelectedContact(null); }} className={`${mondrianButton} ${t.inputBgAlt} ${t.text} w-full md:w-auto`}>
+                  <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 sm:ml-auto w-full sm:w-auto">
+                    <button onClick={() => { setIsEditMode(false); if(!formData.id) setSelectedContact(null); }} className={`${mondrianButton} ${t.inputBgAlt} ${t.text} w-full sm:w-auto`}>
                       Cancelar
                     </button>
-                    <button onClick={handleSaveContact} disabled={isLoading || !formData.lideranca} className={`${mondrianButton} bg-[#007577] text-white w-full md:w-auto`}>
-                      <Icon name="save" size={20} className={isLoading ? "animate-spin" : ""} /> {isLoading ? 'Salvando...' : 'Salvar Alterações'}
+                    <button onClick={handleSaveContact} disabled={isLoading || !formData.lideranca} className={`${mondrianButton} bg-[#007577] text-white w-full sm:w-auto`}>
+                      <Icon name="save" size={20} className={isLoading ? "animate-spin" : ""} /> {isLoading ? 'Salvando...' : 'Salvar'}
                     </button>
                   </div>
                 </div>
               </div>
             ) : (
-              // MODO VISUALIZAÇÃO
               <>
                 {selectedContact.area_de_atuacao && (
-                  <div className={`mb-6 p-4 ${t.inputBgAlt} border-2 ${t.border} rounded-lg flex items-center gap-3`}>
-                    <span className="text-[#DCAE1D]"><Icon name="briefcase" size={28} /></span>
+                  <div className={`mb-6 p-3 md:p-4 ${t.inputBgAlt} border-2 ${t.border} rounded-lg flex items-center gap-3`}>
+                    <span className="text-[#DCAE1D] shrink-0"><Icon name="briefcase" size={24} /></span>
                     <div>
-                      <p className={`font-bold text-lg ${t.text}`}>{selectedContact.area_de_atuacao}</p>
-                      <p className={`text-sm font-semibold ${t.textMuted}`}>Área de Atuação</p>
+                      <p className={`font-bold text-base md:text-lg leading-tight ${t.text}`}>{selectedContact.area_de_atuacao}</p>
+                      <p className={`text-xs md:text-sm font-semibold ${t.textMuted}`}>Área de Atuação</p>
                     </div>
                   </div>
                 )}
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6 mb-6 md:mb-8">
                   <div className="space-y-4">
                     <div>
-                      <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">Localização</label>
-                      <p className={`font-bold flex items-start gap-2 ${t.text}`}>
-                        <span className="text-[#007577] mt-1 shrink-0"><Icon name="map" size={18}/></span> 
+                      <label className="text-[10px] md:text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">Localização</label>
+                      <p className={`font-bold flex items-start gap-2 text-sm md:text-base ${t.text}`}>
+                        <span className="text-[#007577] mt-0.5 shrink-0"><Icon name="map" size={16}/></span> 
                         <span>
                           <span className="block">{selectedContact.municipio_bairro} {selectedContact.distrito ? `/ ${selectedContact.distrito}` : ''}</span>
-                          <span className={`text-sm ${t.textMuted}`}>{selectedContact.regiao}</span>
+                          <span className={`text-xs md:text-sm ${t.textMuted}`}>{selectedContact.regiao}</span>
                         </span>
                       </p>
                     </div>
                     <div>
-                      <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">Telefone</label>
-                      <p className={`font-bold flex items-center gap-2 ${t.text}`}><span className="text-[#DCAE1D]"><Icon name="phone" size={18}/></span> {selectedContact.telefone || 'N/A'}</p>
+                      <label className="text-[10px] md:text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">Telefone</label>
+                      <p className={`font-bold flex items-center gap-2 text-sm md:text-base break-all ${t.text}`}><span className="text-[#DCAE1D] shrink-0"><Icon name="phone" size={16}/></span> {selectedContact.telefone || 'N/A'}</p>
                     </div>
                     <div>
-                      <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">E-mail</label>
-                      <p className={`font-bold flex items-center gap-2 ${t.text}`}><span className="text-[#B32033]"><Icon name="mail" size={18}/></span> {selectedContact.email || 'N/A'}</p>
+                      <label className="text-[10px] md:text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">E-mail</label>
+                      <p className={`font-bold flex items-center gap-2 text-sm md:text-base break-all ${t.text}`}><span className="text-[#B32033] shrink-0"><Icon name="mail" size={16}/></span> {selectedContact.email || 'N/A'}</p>
                     </div>
                   </div>
                   <div className="space-y-4">
                     <div>
-                      <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">Articulador(a)</label>
-                      <p className={`font-bold flex items-center gap-2 text-lg ${t.text}`}>
-                        <span className="text-[#B32033]"><Icon name="usercheck" size={20} /></span> {selectedContact.articulador || 'Não informado'}
+                      <label className="text-[10px] md:text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">Articulador(a)</label>
+                      <p className={`font-bold flex items-center gap-2 text-base md:text-lg ${t.text}`}>
+                        <span className="text-[#B32033] shrink-0"><Icon name="usercheck" size={18} /></span> {selectedContact.articulador || 'Não informado'}
                       </p>
                     </div>
                     <div>
-                      <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">Tema Principal</label>
-                      <p className={`font-bold ${t.text}`}>{selectedContact.temas || 'N/A'}</p>
+                      <label className="text-[10px] md:text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">Tema Principal</label>
+                      <p className={`font-bold text-sm md:text-base ${t.text}`}>{selectedContact.temas || 'N/A'}</p>
                     </div>
                     <div>
-                      <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">Tema Institucional</label>
-                      <p className={`font-bold ${t.text}`}>{selectedContact.tema_institucional || 'N/A'}</p>
+                      <label className="text-[10px] md:text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">Tema Institucional</label>
+                      <p className={`font-bold text-sm md:text-base ${t.text}`}>{selectedContact.tema_institucional || 'N/A'}</p>
                     </div>
                   </div>
                 </div>
-                <div className={`border-t-[3px] ${t.border} pt-6`}>
-                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-2">Observações</label>
-                  <div className={`${t.inputBgAlt} p-4 rounded-lg border-2 ${t.border} font-medium ${t.text} text-lg leading-relaxed whitespace-pre-wrap`}>
+                <div className={`border-t-[3px] ${t.border} pt-4 md:pt-6`}>
+                  <label className="text-[10px] md:text-xs font-bold text-gray-500 uppercase tracking-wider block mb-2">Observações</label>
+                  <div className={`${t.inputBgAlt} p-3 md:p-4 rounded-lg border-2 ${t.border} font-medium ${t.text} text-sm md:text-lg leading-relaxed whitespace-pre-wrap`}>
                     {selectedContact.observacoes || 'Sem anotações.'}
                   </div>
                 </div>
@@ -751,7 +739,7 @@ export default function App() {
   };
 
   return (
-    <div className={`min-h-screen ${t.bgApp} p-4 md:p-8 font-sans selection:bg-[#DCAE1D] selection:text-[#1A1A1A] transition-colors duration-300`}>
+    <div className={`min-h-screen ${t.bgApp} p-3 sm:p-4 md:p-8 font-sans selection:bg-[#DCAE1D] selection:text-[#1A1A1A] transition-colors duration-300 overflow-x-hidden`}>
       <style dangerouslySetInnerHTML={{__html: `
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap');
         body { font-family: 'Inter', sans-serif; }
@@ -763,32 +751,32 @@ export default function App() {
       `}} />
 
       <div className="max-w-6xl mx-auto">
-        <header className={`mb-8 flex flex-col md:flex-row md:items-end justify-between border-b-[4px] ${t.border} pb-6 gap-6 relative`}>
-          <div className="flex items-center gap-4 relative z-10">
-            <div className={`w-16 h-16 bg-[#1A1A1A] border-[3px] ${t.border} rounded-xl shadow-mondrian flex items-center justify-center flex-shrink-0`}>
-              <Icon name="users" size={32} className="text-[#DCAE1D]" />
+        <header className={`mb-6 md:mb-8 flex flex-col sm:flex-row sm:items-end justify-between border-b-[4px] ${t.border} pb-4 md:pb-6 gap-4 relative`}>
+          <div className="flex items-center gap-3 md:gap-4 relative z-10">
+            <div className={`w-12 h-12 md:w-16 md:h-16 bg-[#1A1A1A] border-[3px] ${t.border} rounded-xl shadow-mondrian flex items-center justify-center flex-shrink-0`}>
+              <Icon name="users" size={28} className="text-[#DCAE1D] md:w-8 md:h-8 w-6 h-6" />
             </div>
             <div>
-              <h1 className={`text-3xl md:text-4xl font-black uppercase tracking-tight ${t.text}`}>TABULUM</h1>
-              <p className="text-lg font-bold text-[#007577]">Mapa de Lideranças</p>
+              <h1 className={`text-2xl md:text-4xl font-black uppercase tracking-tight ${t.text} leading-none`}>TABULUM</h1>
+              <p className="text-sm md:text-lg font-bold text-[#007577] mt-1">Mapa de Lideranças</p>
             </div>
           </div>
-          <div className="flex gap-2 relative z-10">
-            <span className={`h-4 w-4 rounded-sm border-2 ${t.border} bg-[#B32033]`}></span>
-            <span className={`h-4 w-4 rounded-sm border-2 ${t.border} bg-[#007577]`}></span>
-            <span className={`h-4 w-4 rounded-sm border-2 ${t.border} bg-[#DCAE1D]`}></span>
+          <div className="flex gap-2 relative z-10 self-start sm:self-auto ml-1 sm:ml-0 mt-2 sm:mt-0">
+            <span className={`h-3 w-3 md:h-4 md:w-4 rounded-sm border-2 ${t.border} bg-[#B32033]`}></span>
+            <span className={`h-3 w-3 md:h-4 md:w-4 rounded-sm border-2 ${t.border} bg-[#007577]`}></span>
+            <span className={`h-3 w-3 md:h-4 md:w-4 rounded-sm border-2 ${t.border} bg-[#DCAE1D]`}></span>
           </div>
         </header>
 
-        <nav className="flex flex-wrap gap-4 mb-8">
+        <nav className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4 mb-6 md:mb-8">
           <button onClick={() => setView('dashboard')} className={`${mondrianButton} ${view === 'dashboard' ? 'bg-[#DCAE1D] text-[#1A1A1A]' : `${t.cardBg} ${t.text}`}`}>
-            <Icon name="dashboard" size={20} /> Dashboard
+            <Icon name="dashboard" size={20} /> <span className="truncate">Dashboard</span>
           </button>
           <button onClick={() => setView('directory')} className={`${mondrianButton} ${view === 'directory' ? 'bg-[#007577] text-white' : `${t.cardBg} ${t.text}`}`}>
-            <Icon name="directory" size={20} /> Diretório
+            <Icon name="directory" size={20} /> <span className="truncate">Diretório</span>
           </button>
-          <button onClick={() => setView('settings')} className={`${mondrianButton} ${view === 'settings' ? 'bg-[#B32033] text-white' : `${t.cardBg} ${t.text}`} ml-auto`}>
-            <Icon name={isSettingsUnlocked ? "settings" : "lock"} size={20} /> Ajustes
+          <button onClick={() => setView('settings')} className={`${mondrianButton} ${view === 'settings' ? 'bg-[#B32033] text-white' : `${t.cardBg} ${t.text}`}`}>
+            <Icon name={isSettingsUnlocked ? "settings" : "lock"} size={20} /> <span className="truncate">Ajustes</span>
           </button>
         </nav>
 
@@ -801,13 +789,13 @@ export default function App() {
 
       {renderModal()}
       
-      {/* DIALOGOS DE ALERTA E CONFIRMAÇÃO SEGUROS */}
+      {/* Dialogos de Alerta/Confirm (Evitando window.alert mobile blockers) */}
       {dialog && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animation-fade-in">
-          <div className={`${mondrianCard} w-full max-w-sm p-6 text-center`}>
+          <div className={`${mondrianCard} w-full max-w-sm p-6 text-center shadow-2xl`}>
             <Icon name="alert" size={48} className={`mx-auto mb-4 ${dialog.type === 'confirm' ? 'text-[#DCAE1D]' : 'text-[#B32033]'}`} />
             <p className={`font-bold text-lg mb-6 ${t.text}`}>{dialog.message}</p>
-            <div className="flex gap-4 justify-center">
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
               {dialog.type === 'confirm' && (
                 <button onClick={() => setDialog(null)} className={`${mondrianButton} ${t.inputBgAlt} ${t.text} flex-1`}>
                   Cancelar
