@@ -3,11 +3,10 @@ import React, { useState, useMemo, useEffect } from 'react';
 // ==========================================
 // 🔗 CONFIGURAÇÃO DE URL SEGURA (VARIÁVEIS DE AMBIENTE)
 // ==========================================
-// O app tenta puxar a URL do Vercel (Next.js/CRA/Vite). 
-// Se não encontrar, usa uma string vazia como fallback.
+// Prioriza a sintaxe do Vite (import.meta.env), vital para funcionar no celular pelo Vercel.
 const GOOGLE_SHEETS_WEBAPP_URL = 
+  (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_SHEETS_URL) || 
   (typeof process !== 'undefined' && process.env && process.env.REACT_APP_SHEETS_URL) || 
-  (typeof process !== 'undefined' && process.env && process.env.NEXT_PUBLIC_SHEETS_URL) || 
   ""; 
 
 const Icon = ({ name, size = 24, className = "" }) => {
@@ -56,7 +55,6 @@ const Icon = ({ name, size = 24, className = "" }) => {
   );
 };
 
-// Dados baseados na estrutura real dos CSVs
 const INITIAL_MOCK_DATA = [
   { id: "mock_1", base: "Base Florianópolis", lideranca: "Fátima Lima", municipio_bairro: "Armação", regiao: "Sul", distrito: "Pântano do Sul", situacao: "3 - Pré alinhado", area_de_atuacao: "Cultura/Teatro", temas: "Cultura", tema_institucional: "FUNDO SOCIAL", articulador: "Guto", telefone: "48984692944", email: "costadelimafatima@gmail.com", observacoes: "" },
   { id: "mock_2", base: "Base Santa Catarina", lideranca: "Amilton", municipio_bairro: "Santo Amaro da Imperatriz", regiao: "GRANDE FLORIANÓPOLIS", distrito: "", situacao: "4 - Comprometido", area_de_atuacao: "Agricultor Orgânico", temas: "Agroecologia", tema_institucional: "AGRICULTURA", articulador: "Toninho", telefone: "48996905764", email: "", observacoes: "" },
@@ -98,10 +96,12 @@ export default function App() {
   const [selectedContact, setSelectedContact] = useState(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [formData, setFormData] = useState({});
+  const [dialog, setDialog] = useState(null); // Substitui window.confirm e window.alert
   
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [mapScope, setMapScope] = useState('SC');
   
+  // Filtros unificados (Aplicam-se ao Dashboard e ao Diretório)
   const [searchTerm, setSearchTerm] = useState('');
   const [filterBase, setFilterBase] = useState('Todas');
   const [filterTemas, setFilterTemas] = useState('Todos');
@@ -173,7 +173,7 @@ export default function App() {
       await syncWithCloud();
     } catch (e) {
       console.error("Erro ao salvar na nuvem:", e);
-      alert("Ocorreu um erro ao comunicar com a planilha.");
+      setDialog({ type: 'alert', message: "Ocorreu um erro ao comunicar com a planilha. Verifique a URL." });
     } finally {
       setIsLoading(false);
     }
@@ -183,7 +183,7 @@ export default function App() {
     const isNew = !formData.id;
     const contactToSave = { ...formData };
     
-    // Atualiza State Localmente
+    // Atualiza State Localmente com ID temporário caso seja novo
     if (isNew) {
       contactToSave.id = "temp_" + Date.now(); 
       setContacts(prev => [...prev, contactToSave]);
@@ -191,26 +191,33 @@ export default function App() {
       setContacts(prev => prev.map(c => String(c.id) === String(contactToSave.id) ? contactToSave : c));
     }
     
-    // Envia para a nuvem (vai atribuir o Row ID correto lá)
+    // Envia para a nuvem
     await saveToCloud('update', contactToSave);
     
     setSelectedContact(null);
     setIsEditMode(false);
   };
 
-  const handleDeleteContact = async (id) => {
-    if (!window.confirm("Tem certeza que deseja apagar esta liderança?")) return;
-    setContacts(prev => prev.filter(c => String(c.id) !== String(id)));
-    await saveToCloud('delete', { id });
-    setSelectedContact(null);
-    setIsEditMode(false);
+  const handleDeleteContact = (id) => {
+    setDialog({
+      type: 'confirm',
+      message: 'Tem certeza que deseja apagar permanentemente esta liderança?',
+      onConfirm: async () => {
+        setDialog(null);
+        setContacts(prev => prev.filter(c => String(c.id) !== String(id)));
+        await saveToCloud('delete', { id });
+        setSelectedContact(null);
+        setIsEditMode(false);
+      }
+    });
   };
 
   const openNewContactModal = () => {
     setFormData({
       id: '', base: 'Base Florianópolis', lideranca: '', municipio_bairro: '',
       regiao: '', distrito: '', situacao: '', area_de_atuacao: '', temas: '',
-      tema_institucional: '', articulador: '', telefone: '', email: '', observacoes: ''
+      tema_institucional: '', articulador: filterArticulador !== 'Todos' ? filterArticulador : '', 
+      telefone: '', email: '', observacoes: ''
     });
     setIsEditMode(true);
     setSelectedContact({ isNew: true });
@@ -232,13 +239,12 @@ export default function App() {
       setIsSettingsUnlocked(true);
       setSettingsPasswordInput('');
     } else {
-      alert('Senha incorreta.');
+      setDialog({ type: 'alert', message: 'Senha incorreta. Acesso negado.' });
       setSettingsPasswordInput('');
     }
   };
 
-  // === RENDERIZAÇÃO DA INTERFACE ===
-
+  // Aplica todos os filtros selecionados para a visualização no Diretório
   const filteredContacts = useMemo(() => {
     return contacts.filter(contact => {
       const nomeMatch = contact.lideranca?.toLowerCase().includes(searchTerm.toLowerCase());
@@ -255,6 +261,7 @@ export default function App() {
     });
   }, [contacts, searchTerm, filterBase, filterTemas, filterSituacao, filterArticulador]);
 
+  // Contatos utilizados exclusivamente para o Dashboard (obedece o filtro de Articulador)
   const dashboardContacts = useMemo(() => {
     if (filterArticulador === 'Todos') return contacts;
     return contacts.filter(c => c.articulador === filterArticulador);
@@ -290,7 +297,7 @@ export default function App() {
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
           <h3 className="text-2xl font-bold flex items-center gap-2">
             <Icon name="map" size={28} className="text-[#DCAE1D]" /> 
-            Densidade: {mapScope === 'SC' ? 'Santa Catarina' : 'Florianópolis'}
+            Densidade Territorial: {mapScope === 'SC' ? 'Santa Catarina' : 'Florianópolis'}
           </h3>
           <div className="flex border-[3px] border-[#F4F4F0] rounded-lg overflow-hidden shrink-0">
             <button onClick={() => setMapScope('SC')} className={`px-4 py-2 font-bold transition-colors ${mapScope === 'SC' ? 'bg-[#DCAE1D] text-[#1A1A1A]' : 'bg-transparent text-[#F4F4F0] hover:bg-gray-800'}`}>SC</button>
@@ -341,7 +348,7 @@ export default function App() {
   const renderDashboard = () => (
     <div className="space-y-6 animation-fade-in">
       
-      {/* BARRA DE FILTRO DO DASHBOARD */}
+      {/* BARRA DE FILTRO DE ARTICULADOR DO DASHBOARD */}
       <div className={`p-4 rounded-xl border-[3px] ${t.border} ${t.cardBg} flex flex-col md:flex-row justify-between items-center gap-4 shadow-mondrian`}>
         <h2 className={`text-xl font-black ${t.text} flex items-center gap-2`}>
           <Icon name="dashboard" /> Visão Geral
@@ -350,7 +357,7 @@ export default function App() {
           <label className={`font-bold ${t.textMuted} text-sm whitespace-nowrap`}>Filtrar Articulador:</label>
           <select 
             value={filterArticulador} 
-            onChange={e => setFilterArticulador(e.target.value)} 
+            onChange={(e) => setFilterArticulador(e.target.value)} 
             className={`w-full md:w-48 px-3 py-2 rounded-lg border-2 ${t.border} font-medium ${t.inputBg} ${t.text}`}
           >
             {articuladoresExtraidos.map(a => <option key={a} value={a}>{a}</option>)}
@@ -377,23 +384,27 @@ export default function App() {
           <h3 className={`text-2xl font-bold mb-6 border-b-[3px] ${t.border} pb-2 flex items-center gap-2 ${t.text}`}>
             <Icon name="barchart" /> Principais Temas
           </h3>
-          <div className="space-y-4 max-w-3xl">
-            {stats.topTemas.map(([nome, count], index) => {
-              const max = Math.max(...stats.topTemas.map(t => t[1]));
-              const percentage = (count / max) * 100;
-              const colors = ['bg-[#B32033]', 'bg-[#007577]', 'bg-[#DCAE1D]', isDarkMode ? 'bg-gray-400' : 'bg-[#1A1A1A]'];
-              return (
-                <div key={nome}>
-                  <div className={`flex justify-between text-sm font-bold mb-1 ${t.text}`}>
-                    <span>{nome}</span><span>{count} contatos</span>
+          {stats.topTemas.length > 0 ? (
+            <div className="space-y-4 max-w-3xl">
+              {stats.topTemas.map(([nome, count], index) => {
+                const max = Math.max(...stats.topTemas.map(t => t[1]));
+                const percentage = (count / max) * 100;
+                const colors = ['bg-[#B32033]', 'bg-[#007577]', 'bg-[#DCAE1D]', isDarkMode ? 'bg-gray-400' : 'bg-[#1A1A1A]'];
+                return (
+                  <div key={nome}>
+                    <div className={`flex justify-between text-sm font-bold mb-1 ${t.text}`}>
+                      <span>{nome}</span><span>{count} contatos</span>
+                    </div>
+                    <div className={`h-4 w-full ${t.inputBgAlt} rounded-full border-2 ${t.border} overflow-hidden`}>
+                      <div className={`h-full ${colors[index % colors.length]} transition-all duration-1000 border-r-2 ${t.border}`} style={{ width: `${percentage}%` }}></div>
+                    </div>
                   </div>
-                  <div className={`h-4 w-full ${t.inputBgAlt} rounded-full border-2 ${t.border} overflow-hidden`}>
-                    <div className={`h-full ${colors[index % colors.length]} transition-all duration-1000 border-r-2 ${t.border}`} style={{ width: `${percentage}%` }}></div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className={`font-medium ${t.textMuted}`}>Não há temas suficientes associados a este filtro.</p>
+          )}
         </div>
       </div>
     </div>
@@ -416,25 +427,25 @@ export default function App() {
             <input type="text" placeholder="Nome, área, município..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className={`w-full pl-10 pr-3 py-3 rounded-lg border-[3px] ${t.border} focus:outline-none focus:ring-2 focus:ring-[#B32033] font-medium ${t.inputBg} ${t.text}`} />
           </div>
         </div>
-        <div className="w-full md:w-48 flex flex-col gap-2">
+        <div className="w-full md:w-40 flex flex-col gap-2">
           <label className="font-bold text-[#1A1A1A]">Base</label>
           <select value={filterBase} onChange={(e) => setFilterBase(e.target.value)} className={`w-full px-3 py-3 rounded-lg border-[3px] ${t.border} font-medium ${t.inputBg} ${t.text}`}>
             {bases.map(b => <option key={b} value={b}>{b}</option>)}
           </select>
         </div>
-        <div className="w-full md:w-48 flex flex-col gap-2">
-          <label className="font-bold text-[#1A1A1A]">Tema Principal</label>
+        <div className="w-full md:w-40 flex flex-col gap-2">
+          <label className="font-bold text-[#1A1A1A]">Tema</label>
           <select value={filterTemas} onChange={(e) => setFilterTemas(e.target.value)} className={`w-full px-3 py-3 rounded-lg border-[3px] ${t.border} font-medium ${t.inputBg} ${t.text} truncate`}>
             {temasExtraidos.map(a => <option key={a} value={a}>{a}</option>)}
           </select>
         </div>
-        <div className="w-full md:w-48 flex flex-col gap-2">
+        <div className="w-full md:w-40 flex flex-col gap-2">
           <label className="font-bold text-[#1A1A1A]">Situação</label>
           <select value={filterSituacao} onChange={(e) => setFilterSituacao(e.target.value)} className={`w-full px-3 py-3 rounded-lg border-[3px] ${t.border} font-medium ${t.inputBg} ${t.text} truncate`}>
             {situacoesExtraidas.map(a => <option key={a} value={a}>{a}</option>)}
           </select>
         </div>
-        <div className="w-full md:w-48 flex flex-col gap-2">
+        <div className="w-full md:w-40 flex flex-col gap-2">
           <label className="font-bold text-[#1A1A1A]">Articulador</label>
           <select value={filterArticulador} onChange={(e) => setFilterArticulador(e.target.value)} className={`w-full px-3 py-3 rounded-lg border-[3px] ${t.border} font-medium ${t.inputBg} ${t.text} truncate`}>
             {articuladoresExtraidos.map(a => <option key={a} value={a}>{a}</option>)}
@@ -562,7 +573,7 @@ export default function App() {
     const inputClasses = `w-full px-3 py-2 mt-1 rounded border-2 ${t.border} font-medium ${t.inputBg} ${t.text} focus:outline-none focus:ring-2 focus:ring-[#B32033]`;
 
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animation-fade-in">
+      <div className="fixed inset-0 z-[50] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animation-fade-in">
         <div className={`${mondrianCard} w-full max-w-3xl max-h-[90vh] overflow-y-auto relative flex flex-col md:flex-row`}>
           <div className={`hidden md:block w-8 border-r-[3px] ${t.border} ${isEditMode ? 'bg-[#DCAE1D]' : 'bg-[#B32033]'} flex-shrink-0 transition-colors`}></div>
           <div className="flex-grow p-6 md:p-8">
@@ -789,6 +800,32 @@ export default function App() {
       </div>
 
       {renderModal()}
+      
+      {/* DIALOGOS DE ALERTA E CONFIRMAÇÃO SEGUROS */}
+      {dialog && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animation-fade-in">
+          <div className={`${mondrianCard} w-full max-w-sm p-6 text-center`}>
+            <Icon name="alert" size={48} className={`mx-auto mb-4 ${dialog.type === 'confirm' ? 'text-[#DCAE1D]' : 'text-[#B32033]'}`} />
+            <p className={`font-bold text-lg mb-6 ${t.text}`}>{dialog.message}</p>
+            <div className="flex gap-4 justify-center">
+              {dialog.type === 'confirm' && (
+                <button onClick={() => setDialog(null)} className={`${mondrianButton} ${t.inputBgAlt} ${t.text} flex-1`}>
+                  Cancelar
+                </button>
+              )}
+              <button 
+                onClick={() => {
+                  if (dialog.onConfirm) dialog.onConfirm();
+                  else setDialog(null);
+                }} 
+                className={`${mondrianButton} ${dialog.type === 'confirm' ? 'bg-[#B32033]' : 'bg-[#007577]'} text-white flex-1`}
+              >
+                {dialog.type === 'confirm' ? 'Apagar' : 'OK'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
