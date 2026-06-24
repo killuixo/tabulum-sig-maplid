@@ -1,9 +1,14 @@
 import React, { useState, useMemo, useEffect } from 'react';
 
 // ==========================================
-// 🔗 INSIRA AQUI A URL DO SEU GOOGLE APPS SCRIPT
+// 🔗 CONFIGURAÇÃO DE URL SEGURA (VARIÁVEIS DE AMBIENTE)
 // ==========================================
-const GOOGLE_SHEETS_WEBAPP_URL = ""; 
+// O app tenta puxar a URL do Vercel (Next.js/CRA/Vite). 
+// Se não encontrar, usa uma string vazia como fallback.
+const GOOGLE_SHEETS_WEBAPP_URL = 
+  (typeof process !== 'undefined' && process.env && process.env.REACT_APP_SHEETS_URL) || 
+  (typeof process !== 'undefined' && process.env && process.env.NEXT_PUBLIC_SHEETS_URL) || 
+  ""; 
 
 const Icon = ({ name, size = 24, className = "" }) => {
   const icons = {
@@ -33,7 +38,9 @@ const Icon = ({ name, size = 24, className = "" }) => {
     edit: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7 M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />,
     trash: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />,
     refresh: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />,
-    save: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+    save: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />,
+    lock: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />,
+    unlock: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
   };
   return (
     <svg 
@@ -99,6 +106,11 @@ export default function App() {
   const [filterBase, setFilterBase] = useState('Todas');
   const [filterTemas, setFilterTemas] = useState('Todos');
   const [filterSituacao, setFilterSituacao] = useState('Todas');
+  const [filterArticulador, setFilterArticulador] = useState('Todos');
+
+  // Segurança dos Ajustes
+  const [isSettingsUnlocked, setIsSettingsUnlocked] = useState(false);
+  const [settingsPasswordInput, setSettingsPasswordInput] = useState('');
 
   // Nuvem / Sheets API
   const [localSyncUrl, setLocalSyncUrl] = useState(() => localStorage.getItem('tabulum_sync_url') || GOOGLE_SHEETS_WEBAPP_URL);
@@ -129,6 +141,7 @@ export default function App() {
   const bases = ['Todas', 'Base Florianópolis', 'Base Santa Catarina'];
   const temasExtraidos = ['Todos', ...new Set(contacts.map(c => c.temas).filter(Boolean))].sort();
   const situacoesExtraidas = ['Todas', ...new Set(contacts.map(c => c.situacao).filter(Boolean))].sort();
+  const articuladoresExtraidos = ['Todos', ...new Set(contacts.map(c => c.articulador).filter(Boolean))].sort();
 
   // === FUNÇÕES DA NUVEM (API GOOGLE SHEETS) ===
   const syncWithCloud = async () => {
@@ -213,6 +226,17 @@ export default function App() {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  const handleSettingsLogin = (e) => {
+    e.preventDefault();
+    if (settingsPasswordInput === 'admin') {
+      setIsSettingsUnlocked(true);
+      setSettingsPasswordInput('');
+    } else {
+      alert('Senha incorreta.');
+      setSettingsPasswordInput('');
+    }
+  };
+
   // === RENDERIZAÇÃO DA INTERFACE ===
 
   const filteredContacts = useMemo(() => {
@@ -225,25 +249,31 @@ export default function App() {
       const matchesBase = filterBase === 'Todas' || contact.base === filterBase;
       const matchesTemas = filterTemas === 'Todos' || contact.temas === filterTemas;
       const matchesSituacao = filterSituacao === 'Todas' || contact.situacao === filterSituacao;
+      const matchesArticulador = filterArticulador === 'Todos' || contact.articulador === filterArticulador;
       
-      return matchesSearch && matchesBase && matchesTemas && matchesSituacao;
+      return matchesSearch && matchesBase && matchesTemas && matchesSituacao && matchesArticulador;
     });
-  }, [contacts, searchTerm, filterBase, filterTemas, filterSituacao]);
+  }, [contacts, searchTerm, filterBase, filterTemas, filterSituacao, filterArticulador]);
+
+  const dashboardContacts = useMemo(() => {
+    if (filterArticulador === 'Todos') return contacts;
+    return contacts.filter(c => c.articulador === filterArticulador);
+  }, [contacts, filterArticulador]);
 
   const stats = useMemo(() => {
-    const floripaCount = contacts.filter(c => c.base === 'Base Florianópolis').length;
-    const scCount = contacts.filter(c => c.base === 'Base Santa Catarina').length;
-    const temaCounts = contacts.reduce((acc, curr) => {
+    const floripaCount = dashboardContacts.filter(c => c.base === 'Base Florianópolis').length;
+    const scCount = dashboardContacts.filter(c => c.base === 'Base Santa Catarina').length;
+    const temaCounts = dashboardContacts.reduce((acc, curr) => {
       if(curr.temas) acc[curr.temas] = (acc[curr.temas] || 0) + 1;
       return acc;
     }, {});
     const topTemas = Object.entries(temaCounts).sort((a, b) => b[1] - a[1]).slice(0, 4);
-    return { total: contacts.length, floripaCount, scCount, topTemas };
-  }, [contacts]);
+    return { total: dashboardContacts.length, floripaCount, scCount, topTemas };
+  }, [dashboardContacts]);
 
   const renderHeatMap = () => {
     const heatPoints = {};
-    contacts.forEach(c => {
+    dashboardContacts.forEach(c => {
       if (mapScope === 'FLN' && c.base !== 'Base Florianópolis') return;
       const locName = c.municipio_bairro;
       const coords = MAP_COORDINATES[mapScope][locName];
@@ -310,6 +340,24 @@ export default function App() {
 
   const renderDashboard = () => (
     <div className="space-y-6 animation-fade-in">
+      
+      {/* BARRA DE FILTRO DO DASHBOARD */}
+      <div className={`p-4 rounded-xl border-[3px] ${t.border} ${t.cardBg} flex flex-col md:flex-row justify-between items-center gap-4 shadow-mondrian`}>
+        <h2 className={`text-xl font-black ${t.text} flex items-center gap-2`}>
+          <Icon name="dashboard" /> Visão Geral
+        </h2>
+        <div className="flex items-center gap-3 w-full md:w-auto">
+          <label className={`font-bold ${t.textMuted} text-sm whitespace-nowrap`}>Filtrar Articulador:</label>
+          <select 
+            value={filterArticulador} 
+            onChange={e => setFilterArticulador(e.target.value)} 
+            className={`w-full md:w-48 px-3 py-2 rounded-lg border-2 ${t.border} font-medium ${t.inputBg} ${t.text}`}
+          >
+            {articuladoresExtraidos.map(a => <option key={a} value={a}>{a}</option>)}
+          </select>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className={`${mondrianCard} p-6 flex flex-col justify-between overflow-hidden relative`}>
           <div className={`absolute top-0 right-0 w-16 h-16 bg-[#B32033] border-l-[3px] border-b-[3px] ${t.border} rounded-bl-xl`}></div>
@@ -386,6 +434,12 @@ export default function App() {
             {situacoesExtraidas.map(a => <option key={a} value={a}>{a}</option>)}
           </select>
         </div>
+        <div className="w-full md:w-48 flex flex-col gap-2">
+          <label className="font-bold text-[#1A1A1A]">Articulador</label>
+          <select value={filterArticulador} onChange={(e) => setFilterArticulador(e.target.value)} className={`w-full px-3 py-3 rounded-lg border-[3px] ${t.border} font-medium ${t.inputBg} ${t.text} truncate`}>
+            {articuladoresExtraidos.map(a => <option key={a} value={a}>{a}</option>)}
+          </select>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -417,47 +471,90 @@ export default function App() {
     </div>
   );
 
-  const renderSettings = () => (
-    <div className="space-y-6 animation-fade-in max-w-4xl mx-auto">
-      <div className={`${mondrianCard} p-8`}>
-        <h2 className={`text-3xl font-black mb-8 border-b-[3px] ${t.border} pb-4 flex items-center gap-3 ${t.text}`}>
-          <span className="text-[#B32033]"><Icon name="settings" size={32} /></span> Ajustes
-        </h2>
+  const renderSettings = () => {
+    // TELA DE LOGIN PARA OS AJUSTES
+    if (!isSettingsUnlocked) {
+      return (
+        <div className="space-y-6 animation-fade-in max-w-md mx-auto mt-12">
+          <div className={`${mondrianCard} p-8 text-center`}>
+            <div className="w-16 h-16 mx-auto bg-[#B32033] rounded-full border-[3px] border-[#1A1A1A] flex items-center justify-center text-white mb-6">
+              <Icon name="lock" size={32} />
+            </div>
+            <h2 className={`text-2xl font-black mb-2 ${t.text}`}>Área Restrita</h2>
+            <p className={`mb-6 text-sm ${t.textMuted}`}>Insira a senha de administrador para acessar as configurações do sistema.</p>
+            
+            <form onSubmit={handleSettingsLogin} className="flex flex-col gap-4">
+              <input 
+                type="password" 
+                value={settingsPasswordInput}
+                onChange={(e) => setSettingsPasswordInput(e.target.value)}
+                placeholder="Senha" 
+                className={`w-full px-4 py-3 rounded-lg border-[3px] ${t.border} font-medium ${t.inputBg} ${t.text} text-center tracking-widest focus:outline-none focus:ring-2 focus:ring-[#B32033]`}
+                autoFocus
+              />
+              <button type="submit" className={`${mondrianButton} bg-[#1A1A1A] text-white w-full hover:bg-gray-800`}>
+                Desbloquear
+              </button>
+            </form>
+          </div>
+        </div>
+      );
+    }
 
-        <div className={`mb-10 p-6 border-[3px] ${t.border} rounded-xl ${t.inputBgAlt}`}>
-          <h3 className={`text-xl font-bold mb-4 flex items-center gap-2 ${t.text}`}>
-             <Icon name="refresh" size={24} className="text-[#007577]" /> Sincronização Google Sheets
-          </h3>
-          <p className={`mb-4 text-sm font-medium ${t.textMuted}`}>
-            Insira a URL do Web App gerado no seu Google Apps Script.
-          </p>
-          <div className="flex flex-col md:flex-row gap-4 mb-4">
-            <input 
-              type="text" 
-              value={localSyncUrl} 
-              onChange={(e) => {
-                setLocalSyncUrl(e.target.value);
-                localStorage.setItem('tabulum_sync_url', e.target.value);
-              }}
-              placeholder="https://script.google.com/macros/s/..." 
-              className={`flex-grow px-4 py-3 rounded-lg border-[3px] ${t.border} font-medium ${t.inputBg} ${t.text} focus:outline-none focus:ring-2 focus:ring-[#B32033]`}
-            />
-            <button onClick={syncWithCloud} disabled={isLoading || !localSyncUrl} className={`${mondrianButton} bg-[#007577] text-white shrink-0`}>
-              <Icon name="refresh" size={20} className={isLoading ? "animate-spin" : ""} /> {isLoading ? 'Aguarde...' : 'Sincronizar'}
+    // TELA DE AJUSTES DESBLOQUEADA
+    return (
+      <div className="space-y-6 animation-fade-in max-w-4xl mx-auto">
+        <div className={`${mondrianCard} p-8 relative`}>
+          <button 
+            onClick={() => setIsSettingsUnlocked(false)} 
+            className="absolute top-8 right-8 text-[#B32033] hover:text-red-700 flex items-center gap-2 font-bold text-sm"
+          >
+            <Icon name="lock" size={16} /> Bloquear Sessão
+          </button>
+
+          <h2 className={`text-3xl font-black mb-8 border-b-[3px] ${t.border} pb-4 flex items-center gap-3 ${t.text}`}>
+            <span className="text-[#B32033]"><Icon name="settings" size={32} /></span> Ajustes
+          </h2>
+
+          <div className={`mb-10 p-6 border-[3px] ${t.border} rounded-xl ${t.inputBgAlt}`}>
+            <h3 className={`text-xl font-bold mb-4 flex items-center gap-2 ${t.text}`}>
+               <Icon name="refresh" size={24} className="text-[#007577]" /> Sincronização Google Sheets
+            </h3>
+            <p className={`mb-4 text-sm font-medium ${t.textMuted}`}>
+              A URL primária está sendo puxada de forma segura através das Variáveis de Ambiente do servidor. <br/>
+              Abaixo, você pode forçar a sincronização ou testar temporariamente outra URL.
+            </p>
+            <div className="flex flex-col md:flex-row gap-4 mb-4">
+              <input 
+                type="text" 
+                value={localSyncUrl} 
+                onChange={(e) => {
+                  setLocalSyncUrl(e.target.value);
+                  localStorage.setItem('tabulum_sync_url', e.target.value);
+                }}
+                placeholder="https://script.google.com/macros/s/..." 
+                className={`flex-grow px-4 py-3 rounded-lg border-[3px] ${t.border} font-medium ${t.inputBg} ${t.text} focus:outline-none focus:ring-2 focus:ring-[#B32033]`}
+              />
+              <button onClick={syncWithCloud} disabled={isLoading || !localSyncUrl} className={`${mondrianButton} bg-[#007577] text-white shrink-0`}>
+                <Icon name="refresh" size={20} className={isLoading ? "animate-spin" : ""} /> {isLoading ? 'Aguarde...' : 'Sincronizar Agora'}
+              </button>
+            </div>
+            {(!localSyncUrl) && (
+              <p className="text-xs text-[#B32033] font-bold">Variável de ambiente não detectada. Insira o link acima para testar.</p>
+            )}
+          </div>
+
+          <div className={`mb-10 p-6 border-[3px] ${t.border} rounded-xl ${t.inputBgAlt}`}>
+            <h3 className={`text-xl font-bold mb-4 ${t.text}`}>Aparência</h3>
+            <button onClick={() => setIsDarkMode(!isDarkMode)} className={`${mondrianButton} ${t.cardBg} ${t.text} w-full md:w-auto`}>
+              {isDarkMode ? <span className="text-[#DCAE1D]"><Icon name="sun" size={20} /></span> : <span className="text-[#007577]"><Icon name="moon" size={20} /></span>}
+              Alternar para Tema {isDarkMode ? 'Claro' : 'Escuro'}
             </button>
           </div>
         </div>
-
-        <div className={`mb-10 p-6 border-[3px] ${t.border} rounded-xl ${t.inputBgAlt}`}>
-          <h3 className={`text-xl font-bold mb-4 ${t.text}`}>Aparência</h3>
-          <button onClick={() => setIsDarkMode(!isDarkMode)} className={`${mondrianButton} ${t.cardBg} ${t.text} w-full md:w-auto`}>
-            {isDarkMode ? <span className="text-[#DCAE1D]"><Icon name="sun" size={20} /></span> : <span className="text-[#007577]"><Icon name="moon" size={20} /></span>}
-            Alternar para Tema {isDarkMode ? 'Claro' : 'Escuro'}
-          </button>
-        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   const renderModal = () => {
     if (!selectedContact) return null;
@@ -680,7 +777,7 @@ export default function App() {
             <Icon name="directory" size={20} /> Diretório
           </button>
           <button onClick={() => setView('settings')} className={`${mondrianButton} ${view === 'settings' ? 'bg-[#B32033] text-white' : `${t.cardBg} ${t.text}`} ml-auto`}>
-            <Icon name="settings" size={20} /> Ajustes
+            <Icon name={isSettingsUnlocked ? "settings" : "lock"} size={20} /> Ajustes
           </button>
         </nav>
 
