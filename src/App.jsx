@@ -2,7 +2,6 @@ import React, { useState, useMemo, useEffect } from 'react';
 
 // ==========================================
 // 🔗 INSIRA AQUI A URL DO SEU GOOGLE APPS SCRIPT
-// Se preenchido, o app fará o load universal para todos os usuários
 // ==========================================
 const GOOGLE_SHEETS_WEBAPP_URL = ""; 
 
@@ -50,30 +49,37 @@ const Icon = ({ name, size = 24, className = "" }) => {
   );
 };
 
+// Dados baseados na estrutura real dos CSVs
 const INITIAL_MOCK_DATA = [
-  { id: 1, nome: "João Silva Exemplo", base: "Base Florianópolis", localidade: "Centro", endereco: "Rua Exemplo, 123", atuacao: "Meio Ambiente", organizacao: "Inst. Exemplo", cargo: "Presidente", telefone: "(00) 90000-0001", email: "joao@exemplo.com", redes_sociais: "@joaoexemplo", articulador: "Assessor A", prioridade: "Alta", notas: "Liderança importante na região central." },
-  { id: 2, nome: "Maria Souza Simulação", base: "Base Santa Catarina", localidade: "Joinville", endereco: "Av. Fictícia, 45", atuacao: "Mobilidade Urbana", organizacao: "Pedala Exemplo", cargo: "Coordenadora", telefone: "(00) 90000-0002", email: "maria@exemplo.com", redes_sociais: "@mariasimulacao", articulador: "Assessor B", prioridade: "Média", notas: "Organiza o coletivo da zona norte." },
+  { id: "mock_1", base: "Base Florianópolis", lideranca: "Fátima Lima", municipio_bairro: "Armação", regiao: "Sul", distrito: "Pântano do Sul", situacao: "3 - Pré alinhado", area_de_atuacao: "Cultura/Teatro", temas: "Cultura", tema_institucional: "FUNDO SOCIAL", articulador: "Guto", telefone: "48984692944", email: "costadelimafatima@gmail.com", observacoes: "" },
+  { id: "mock_2", base: "Base Santa Catarina", lideranca: "Amilton", municipio_bairro: "Santo Amaro da Imperatriz", regiao: "GRANDE FLORIANÓPOLIS", distrito: "", situacao: "4 - Comprometido", area_de_atuacao: "Agricultor Orgânico", temas: "Agroecologia", tema_institucional: "AGRICULTURA", articulador: "Toninho", telefone: "48996905764", email: "", observacoes: "" },
 ];
 
 const MAP_COORDINATES = {
   SC: {
     "Florianópolis": { x: 88, y: 55 },
-    "Centro": { x: 88, y: 55 }, 
-    "Sul da Ilha": { x: 88, y: 55 },
-    "Continente": { x: 88, y: 55 },
-    "Norte da Ilha": { x: 88, y: 55 },
+    "Santo Amaro da Imperatriz": { x: 85, y: 55 },
+    "São José": { x: 87, y: 54 },
+    "Palhoça": { x: 86, y: 56 },
     "Joinville": { x: 85, y: 20 },
     "Chapecó": { x: 15, y: 45 },
     "Criciúma": { x: 80, y: 85 },
     "Lages": { x: 55, y: 65 },
     "Blumenau": { x: 75, y: 35 },
-    "Itajaí": { x: 85, y: 35 }
+    "Itajaí": { x: 85, y: 35 },
+    "Garopaba": { x: 87, y: 65 }
   },
   FLN: {
     "Centro": { x: 45, y: 45 },
     "Sul da Ilha": { x: 55, y: 75 },
+    "Campeche": { x: 58, y: 70 },
+    "Armação": { x: 60, y: 85 },
+    "Rio Tavares": { x: 55, y: 65 },
     "Norte da Ilha": { x: 50, y: 20 },
+    "Ingleses": { x: 65, y: 15 },
+    "Canasvieiras": { x: 45, y: 10 },
     "Continente": { x: 30, y: 42 },
+    "Coqueiros": { x: 32, y: 45 },
     "Lagoa da Conceição": { x: 65, y: 45 },
     "Trindade": { x: 48, y: 40 }
   }
@@ -91,18 +97,15 @@ export default function App() {
   
   const [searchTerm, setSearchTerm] = useState('');
   const [filterBase, setFilterBase] = useState('Todas');
-  const [filterAtuacao, setFilterAtuacao] = useState('Todas');
-  const [filterArticulador, setFilterArticulador] = useState('Todos');
+  const [filterTemas, setFilterTemas] = useState('Todos');
+  const [filterSituacao, setFilterSituacao] = useState('Todas');
 
   // Nuvem / Sheets API
   const [localSyncUrl, setLocalSyncUrl] = useState(() => localStorage.getItem('tabulum_sync_url') || GOOGLE_SHEETS_WEBAPP_URL);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Sincronizar ao iniciar (Universal App Load)
   useEffect(() => {
-    if (localSyncUrl) {
-      syncWithCloud();
-    }
+    if (localSyncUrl) syncWithCloud();
   }, []);
 
   useEffect(() => {
@@ -124,8 +127,8 @@ export default function App() {
   const mondrianButton = `font-bold border-[3px] ${t.border} rounded-xl shadow-mondrian-btn transition-all flex items-center justify-center gap-2 px-6 py-3 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed`;
 
   const bases = ['Todas', 'Base Florianópolis', 'Base Santa Catarina'];
-  const atuacoes = ['Todas', ...new Set(contacts.map(c => c.atuacao).filter(Boolean))].sort();
-  const articuladores = ['Todos', ...new Set(contacts.map(c => c.articulador).filter(Boolean))].sort();
+  const temasExtraidos = ['Todos', ...new Set(contacts.map(c => c.temas).filter(Boolean))].sort();
+  const situacoesExtraidas = ['Todas', ...new Set(contacts.map(c => c.situacao).filter(Boolean))].sort();
 
   // === FUNÇÕES DA NUVEM (API GOOGLE SHEETS) ===
   const syncWithCloud = async () => {
@@ -150,13 +153,14 @@ export default function App() {
     try {
       await fetch(localSyncUrl, {
         method: 'POST',
-        // Usar text/plain evita bloqueios agressivos de CORS Preflight (OPTIONS)
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify({ _action: action, ...dataPayload })
       });
+      // Resync to get updated Row IDs from Server
+      await syncWithCloud();
     } catch (e) {
       console.error("Erro ao salvar na nuvem:", e);
-      alert("Ocorreu um erro ao comunicar com a planilha. Verifique a URL do Web App.");
+      alert("Ocorreu um erro ao comunicar com a planilha.");
     } finally {
       setIsLoading(false);
     }
@@ -165,18 +169,16 @@ export default function App() {
   const handleSaveContact = async () => {
     const isNew = !formData.id;
     const contactToSave = { ...formData };
-    if (isNew) {
-      contactToSave.id = Date.now().toString(); // Gerar ID único
-    }
-
+    
     // Atualiza State Localmente
     if (isNew) {
+      contactToSave.id = "temp_" + Date.now(); 
       setContacts(prev => [...prev, contactToSave]);
     } else {
       setContacts(prev => prev.map(c => String(c.id) === String(contactToSave.id) ? contactToSave : c));
     }
     
-    // Atualiza na Nuvem
+    // Envia para a nuvem (vai atribuir o Row ID correto lá)
     await saveToCloud('update', contactToSave);
     
     setSelectedContact(null);
@@ -185,22 +187,17 @@ export default function App() {
 
   const handleDeleteContact = async (id) => {
     if (!window.confirm("Tem certeza que deseja apagar esta liderança?")) return;
-    
-    // Atualiza State Localmente
     setContacts(prev => prev.filter(c => String(c.id) !== String(id)));
-    
-    // Deleta na Nuvem
     await saveToCloud('delete', { id });
-    
     setSelectedContact(null);
     setIsEditMode(false);
   };
 
   const openNewContactModal = () => {
     setFormData({
-      id: '', nome: '', base: 'Base Florianópolis', localidade: '', endereco: '',
-      atuacao: '', organizacao: '', cargo: '', telefone: '', email: '',
-      redes_sociais: '', articulador: '', prioridade: 'Média', notas: ''
+      id: '', base: 'Base Florianópolis', lideranca: '', municipio_bairro: '',
+      regiao: '', distrito: '', situacao: '', area_de_atuacao: '', temas: '',
+      tema_institucional: '', articulador: '', telefone: '', email: '', observacoes: ''
     });
     setIsEditMode(true);
     setSelectedContact({ isNew: true });
@@ -220,32 +217,35 @@ export default function App() {
 
   const filteredContacts = useMemo(() => {
     return contacts.filter(contact => {
-      const matchesSearch = contact.nome?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                            contact.localidade?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                            (contact.organizacao && contact.organizacao.toLowerCase().includes(searchTerm.toLowerCase()));
+      const nomeMatch = contact.lideranca?.toLowerCase().includes(searchTerm.toLowerCase());
+      const localMatch = contact.municipio_bairro?.toLowerCase().includes(searchTerm.toLowerCase());
+      const areaMatch = contact.area_de_atuacao?.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const matchesSearch = nomeMatch || localMatch || areaMatch;
       const matchesBase = filterBase === 'Todas' || contact.base === filterBase;
-      const matchesAtuacao = filterAtuacao === 'Todas' || contact.atuacao === filterAtuacao;
-      const matchesArticulador = filterArticulador === 'Todos' || contact.articulador === filterArticulador;
-      return matchesSearch && matchesBase && matchesAtuacao && matchesArticulador;
+      const matchesTemas = filterTemas === 'Todos' || contact.temas === filterTemas;
+      const matchesSituacao = filterSituacao === 'Todas' || contact.situacao === filterSituacao;
+      
+      return matchesSearch && matchesBase && matchesTemas && matchesSituacao;
     });
-  }, [contacts, searchTerm, filterBase, filterAtuacao, filterArticulador]);
+  }, [contacts, searchTerm, filterBase, filterTemas, filterSituacao]);
 
   const stats = useMemo(() => {
     const floripaCount = contacts.filter(c => c.base === 'Base Florianópolis').length;
     const scCount = contacts.filter(c => c.base === 'Base Santa Catarina').length;
-    const atuacaoCounts = contacts.reduce((acc, curr) => {
-      if(curr.atuacao) acc[curr.atuacao] = (acc[curr.atuacao] || 0) + 1;
+    const temaCounts = contacts.reduce((acc, curr) => {
+      if(curr.temas) acc[curr.temas] = (acc[curr.temas] || 0) + 1;
       return acc;
     }, {});
-    const topAtuacoes = Object.entries(atuacaoCounts).sort((a, b) => b[1] - a[1]).slice(0, 4);
-    return { total: contacts.length, floripaCount, scCount, topAtuacoes };
+    const topTemas = Object.entries(temaCounts).sort((a, b) => b[1] - a[1]).slice(0, 4);
+    return { total: contacts.length, floripaCount, scCount, topTemas };
   }, [contacts]);
 
   const renderHeatMap = () => {
     const heatPoints = {};
     contacts.forEach(c => {
       if (mapScope === 'FLN' && c.base !== 'Base Florianópolis') return;
-      const locName = c.localidade;
+      const locName = c.municipio_bairro;
       const coords = MAP_COORDINATES[mapScope][locName];
       if (coords) {
         if (!heatPoints[locName]) heatPoints[locName] = { ...coords, count: 0, label: locName };
@@ -260,7 +260,7 @@ export default function App() {
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
           <h3 className="text-2xl font-bold flex items-center gap-2">
             <Icon name="map" size={28} className="text-[#DCAE1D]" /> 
-            Densidade Territorial: {mapScope === 'SC' ? 'Santa Catarina' : 'Florianópolis'}
+            Densidade: {mapScope === 'SC' ? 'Santa Catarina' : 'Florianópolis'}
           </h3>
           <div className="flex border-[3px] border-[#F4F4F0] rounded-lg overflow-hidden shrink-0">
             <button onClick={() => setMapScope('SC')} className={`px-4 py-2 font-bold transition-colors ${mapScope === 'SC' ? 'bg-[#DCAE1D] text-[#1A1A1A]' : 'bg-transparent text-[#F4F4F0] hover:bg-gray-800'}`}>SC</button>
@@ -299,18 +299,13 @@ export default function App() {
     );
   };
 
-  const AtuacaoBadge = ({ atuacao }) => {
-    let bgColor = isDarkMode ? "bg-gray-700" : "bg-gray-200";
-    let textColor = t.text;
-    if (!atuacao) return null;
-    if (atuacao === "Meio Ambiente" || atuacao === "Saneamento") { bgColor = "bg-[#007577]"; textColor = "text-white"; }
-    else if (atuacao === "Agroecologia" || atuacao === "Direito à Cidade") { bgColor = "bg-[#DCAE1D]"; textColor = "text-[#1A1A1A]"; }
-    else if (atuacao === "Cultura" || atuacao === "Educação") { bgColor = "bg-[#B32033]"; textColor = "text-white"; }
-    return (
-      <span className={`px-3 py-1 text-xs font-bold rounded-full border-2 ${t.border} ${bgColor} ${textColor}`}>
-        {atuacao}
-      </span>
-    );
+  const SituacaoBadge = ({ situacao }) => {
+    if (!situacao) return null;
+    let cor = isDarkMode ? "bg-gray-700 text-white" : "bg-gray-200 text-[#1A1A1A]";
+    if (situacao.includes("4 -")) cor = "bg-[#007577] text-white";
+    else if (situacao.includes("3 -")) cor = "bg-[#DCAE1D] text-[#1A1A1A]";
+    else if (situacao.includes("1 -")) cor = "bg-[#B32033] text-white";
+    return <span className={`px-2 py-1 text-xs font-bold rounded-md border-2 ${t.border} ${cor}`}>{situacao}</span>;
   };
 
   const renderDashboard = () => (
@@ -332,11 +327,11 @@ export default function App() {
         {renderHeatMap()}
         <div className={`${mondrianCard} p-6 md:col-span-3`}>
           <h3 className={`text-2xl font-bold mb-6 border-b-[3px] ${t.border} pb-2 flex items-center gap-2 ${t.text}`}>
-            <Icon name="barchart" /> Principais Áreas de Atuação
+            <Icon name="barchart" /> Principais Temas
           </h3>
           <div className="space-y-4 max-w-3xl">
-            {stats.topAtuacoes.map(([nome, count], index) => {
-              const max = Math.max(...stats.topAtuacoes.map(t => t[1]));
+            {stats.topTemas.map(([nome, count], index) => {
+              const max = Math.max(...stats.topTemas.map(t => t[1]));
               const percentage = (count / max) * 100;
               const colors = ['bg-[#B32033]', 'bg-[#007577]', 'bg-[#DCAE1D]', isDarkMode ? 'bg-gray-400' : 'bg-[#1A1A1A]'];
               return (
@@ -359,9 +354,9 @@ export default function App() {
   const renderDirectory = () => (
     <div className="space-y-6 animation-fade-in">
       <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-        <h2 className={`text-2xl font-black flex items-center gap-2 ${t.text}`}><Icon name="directory"/> Fichas Cadastradas</h2>
+        <h2 className={`text-2xl font-black flex items-center gap-2 ${t.text}`}><Icon name="directory"/> Diretório Base</h2>
         <button onClick={openNewContactModal} className={`${mondrianButton} bg-[#007577] text-white hover:-translate-y-1`}>
-          <Icon name="plus" size={20} /> Novo Contato
+          <Icon name="plus" size={20} /> Adicionar
         </button>
       </div>
 
@@ -370,21 +365,25 @@ export default function App() {
           <label className="font-bold text-[#1A1A1A]">Buscar</label>
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-500"><Icon name="search" size={20} /></div>
-            <input type="text" placeholder="Nome, organização..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className={`w-full pl-10 pr-3 py-3 rounded-lg border-[3px] ${t.border} focus:outline-none focus:ring-2 focus:ring-[#B32033] font-medium ${t.inputBg} ${t.text}`} />
+            <input type="text" placeholder="Nome, área, município..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className={`w-full pl-10 pr-3 py-3 rounded-lg border-[3px] ${t.border} focus:outline-none focus:ring-2 focus:ring-[#B32033] font-medium ${t.inputBg} ${t.text}`} />
           </div>
         </div>
         <div className="w-full md:w-48 flex flex-col gap-2">
           <label className="font-bold text-[#1A1A1A]">Base</label>
           <select value={filterBase} onChange={(e) => setFilterBase(e.target.value)} className={`w-full px-3 py-3 rounded-lg border-[3px] ${t.border} font-medium ${t.inputBg} ${t.text}`}>
-            <option value="Todas">Todas</option>
-            <option value="Base Florianópolis">Base Florianópolis</option>
-            <option value="Base Santa Catarina">Base Santa Catarina</option>
+            {bases.map(b => <option key={b} value={b}>{b}</option>)}
           </select>
         </div>
         <div className="w-full md:w-48 flex flex-col gap-2">
-          <label className="font-bold text-[#1A1A1A]">Atuação</label>
-          <select value={filterAtuacao} onChange={(e) => setFilterAtuacao(e.target.value)} className={`w-full px-3 py-3 rounded-lg border-[3px] ${t.border} font-medium ${t.inputBg} ${t.text}`}>
-            {atuacoes.map(a => <option key={a} value={a}>{a}</option>)}
+          <label className="font-bold text-[#1A1A1A]">Tema Principal</label>
+          <select value={filterTemas} onChange={(e) => setFilterTemas(e.target.value)} className={`w-full px-3 py-3 rounded-lg border-[3px] ${t.border} font-medium ${t.inputBg} ${t.text} truncate`}>
+            {temasExtraidos.map(a => <option key={a} value={a}>{a}</option>)}
+          </select>
+        </div>
+        <div className="w-full md:w-48 flex flex-col gap-2">
+          <label className="font-bold text-[#1A1A1A]">Situação</label>
+          <select value={filterSituacao} onChange={(e) => setFilterSituacao(e.target.value)} className={`w-full px-3 py-3 rounded-lg border-[3px] ${t.border} font-medium ${t.inputBg} ${t.text} truncate`}>
+            {situacoesExtraidas.map(a => <option key={a} value={a}>{a}</option>)}
           </select>
         </div>
       </div>
@@ -395,13 +394,14 @@ export default function App() {
             <div className={`h-3 w-full border-b-[3px] ${t.border} ${contact.base.includes('Florianópolis') ? 'bg-[#007577]' : 'bg-[#DCAE1D]'}`}></div>
             <div className="p-5 flex-grow flex flex-col gap-3">
               <div>
-                <h3 className={`text-xl font-bold leading-tight mb-1 line-clamp-2 ${t.text}`}>{contact.nome}</h3>
-                <div className={`flex items-center text-sm font-semibold gap-1 mb-1 ${t.textMuted}`}>
-                  <span className="text-[#B32033]"><Icon name="mappin" size={14} /></span> {contact.localidade}
+                <h3 className={`text-xl font-bold leading-tight mb-1 line-clamp-2 ${t.text}`}>{contact.lideranca}</h3>
+                <div className={`flex items-center text-sm font-semibold gap-1 mb-2 ${t.textMuted}`}>
+                  <span className="text-[#B32033]"><Icon name="mappin" size={14} /></span> {contact.municipio_bairro} {contact.distrito ? `- ${contact.distrito}` : ''}
                 </div>
+                <SituacaoBadge situacao={contact.situacao} />
               </div>
               <div className={`mt-auto pt-4 border-t-2 border-dashed ${isDarkMode ? 'border-gray-700' : 'border-gray-300'} flex flex-wrap gap-2 items-center justify-between`}>
-                <AtuacaoBadge atuacao={contact.atuacao} />
+                <span className={`text-xs font-bold truncate ${t.textMuted}`}><Icon name="tag" size={12} className="inline mr-1"/>{contact.temas || 'S/ Tema'}</span>
                 <button className={`p-2 ${t.inputBgAlt} border-2 ${t.border} rounded-md hover:bg-[#B32033] hover:text-white transition-colors ${t.text}`}><Icon name="chevronright" size={18} /></button>
               </div>
             </div>
@@ -421,16 +421,15 @@ export default function App() {
     <div className="space-y-6 animation-fade-in max-w-4xl mx-auto">
       <div className={`${mondrianCard} p-8`}>
         <h2 className={`text-3xl font-black mb-8 border-b-[3px] ${t.border} pb-4 flex items-center gap-3 ${t.text}`}>
-          <span className="text-[#B32033]"><Icon name="settings" size={32} /></span> Ajustes do Sistema
+          <span className="text-[#B32033]"><Icon name="settings" size={32} /></span> Ajustes
         </h2>
 
-        {/* NUVEM / SINCRONIZAÇÃO */}
         <div className={`mb-10 p-6 border-[3px] ${t.border} rounded-xl ${t.inputBgAlt}`}>
           <h3 className={`text-xl font-bold mb-4 flex items-center gap-2 ${t.text}`}>
              <Icon name="refresh" size={24} className="text-[#007577]" /> Sincronização Google Sheets
           </h3>
           <p className={`mb-4 text-sm font-medium ${t.textMuted}`}>
-            Insira a URL do Google Apps Script (Web App) para salvar e puxar dados da planilha automaticamente.
+            Insira a URL do Web App gerado no seu Google Apps Script.
           </p>
           <div className="flex flex-col md:flex-row gap-4 mb-4">
             <input 
@@ -443,19 +442,10 @@ export default function App() {
               placeholder="https://script.google.com/macros/s/..." 
               className={`flex-grow px-4 py-3 rounded-lg border-[3px] ${t.border} font-medium ${t.inputBg} ${t.text} focus:outline-none focus:ring-2 focus:ring-[#B32033]`}
             />
-            <button 
-              onClick={syncWithCloud} 
-              disabled={isLoading || !localSyncUrl}
-              className={`${mondrianButton} bg-[#007577] text-white shrink-0`}
-            >
-              <Icon name="refresh" size={20} className={isLoading ? "animate-spin" : ""} /> {isLoading ? 'Aguarde...' : 'Sincronizar Agora'}
+            <button onClick={syncWithCloud} disabled={isLoading || !localSyncUrl} className={`${mondrianButton} bg-[#007577] text-white shrink-0`}>
+              <Icon name="refresh" size={20} className={isLoading ? "animate-spin" : ""} /> {isLoading ? 'Aguarde...' : 'Sincronizar'}
             </button>
           </div>
-          {GOOGLE_SHEETS_WEBAPP_URL && (
-            <div className={`text-xs font-bold text-[#DCAE1D] p-2 bg-[#1A1A1A] rounded border border-[#DCAE1D] mt-2`}>
-              INFO: URL Global Padrão detectada no código-fonte.
-            </div>
-          )}
         </div>
 
         <div className={`mb-10 p-6 border-[3px] ${t.border} rounded-xl ${t.inputBgAlt}`}>
@@ -486,9 +476,12 @@ export default function App() {
                   <h2 className={`text-2xl font-black flex items-center gap-2 ${t.text}`}><Icon name="edit"/> {formData.id ? 'Editar Contato' : 'Novo Contato'}</h2>
                 ) : (
                   <>
-                    <h2 className={`text-3xl font-black mb-2 pr-12 ${t.text}`}>{selectedContact.nome}</h2>
-                    <div className={`flex items-center gap-2 font-bold ${t.textMuted} ${t.inputBgAlt} w-fit px-3 py-1 rounded-md border-2 ${t.border}`}>
-                      <Icon name="tag" size={16} /> {selectedContact.base}
+                    <h2 className={`text-3xl font-black mb-2 pr-12 ${t.text}`}>{selectedContact.lideranca}</h2>
+                    <div className="flex gap-2 flex-wrap mt-2">
+                      <div className={`flex items-center gap-2 font-bold ${t.textMuted} ${t.inputBgAlt} w-fit px-3 py-1 rounded-md border-2 ${t.border}`}>
+                        <Icon name="tag" size={16} /> {selectedContact.base}
+                      </div>
+                      <SituacaoBadge situacao={selectedContact.situacao} />
                     </div>
                   </>
                 )}
@@ -506,68 +499,66 @@ export default function App() {
             </div>
 
             {isEditMode ? (
-              // MODO EDIÇÃO
+              // MODO EDIÇÃO (Mapeado exatamente para o seu CSV)
               <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className={`text-xs font-bold uppercase ${t.textMuted}`}>Nome Completo *</label>
-                    <input type="text" name="nome" value={formData.nome || ''} onChange={handleFormChange} className={inputClasses} required />
+                    <label className={`text-xs font-bold uppercase ${t.textMuted}`}>Liderança (Nome) *</label>
+                    <input type="text" name="lideranca" value={formData.lideranca || ''} onChange={handleFormChange} className={inputClasses} required />
                   </div>
                   <div>
-                    <label className={`text-xs font-bold uppercase ${t.textMuted}`}>Base</label>
+                    <label className={`text-xs font-bold uppercase ${t.textMuted}`}>Aba / Base *</label>
                     <select name="base" value={formData.base || 'Base Florianópolis'} onChange={handleFormChange} className={inputClasses}>
                       <option value="Base Florianópolis">Base Florianópolis</option>
                       <option value="Base Santa Catarina">Base Santa Catarina</option>
                     </select>
                   </div>
                   <div>
-                    <label className={`text-xs font-bold uppercase ${t.textMuted}`}>Localidade (Cidade/Bairro)</label>
-                    <input type="text" name="localidade" value={formData.localidade || ''} onChange={handleFormChange} className={inputClasses} />
+                    <label className={`text-xs font-bold uppercase ${t.textMuted}`}>Município / Bairro</label>
+                    <input type="text" name="municipio_bairro" value={formData.municipio_bairro || ''} onChange={handleFormChange} className={inputClasses} />
                   </div>
                   <div>
-                    <label className={`text-xs font-bold uppercase ${t.textMuted}`}>Endereço Exato</label>
-                    <input type="text" name="endereco" value={formData.endereco || ''} onChange={handleFormChange} className={inputClasses} />
+                    <label className={`text-xs font-bold uppercase ${t.textMuted}`}>Região</label>
+                    <input type="text" name="regiao" value={formData.regiao || ''} onChange={handleFormChange} className={inputClasses} />
+                  </div>
+                  {formData.base === 'Base Florianópolis' && (
+                    <div>
+                      <label className={`text-xs font-bold uppercase ${t.textMuted}`}>Distrito (Só Floripa)</label>
+                      <input type="text" name="distrito" value={formData.distrito || ''} onChange={handleFormChange} className={inputClasses} />
+                    </div>
+                  )}
+                  <div>
+                    <label className={`text-xs font-bold uppercase ${t.textMuted}`}>Situação</label>
+                    <input type="text" name="situacao" value={formData.situacao || ''} onChange={handleFormChange} placeholder="Ex: 4 - Comprometido" className={inputClasses} />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className={`text-xs font-bold uppercase ${t.textMuted}`}>Área de Atuação Livre</label>
+                    <input type="text" name="area_de_atuacao" value={formData.area_de_atuacao || ''} onChange={handleFormChange} className={inputClasses} />
                   </div>
                   <div>
-                    <label className={`text-xs font-bold uppercase ${t.textMuted}`}>Área de Atuação</label>
-                    <input type="text" name="atuacao" value={formData.atuacao || ''} onChange={handleFormChange} placeholder="Ex: Cultura, Meio Ambiente..." className={inputClasses} />
+                    <label className={`text-xs font-bold uppercase ${t.textMuted}`}>Temas</label>
+                    <input type="text" name="temas" value={formData.temas || ''} onChange={handleFormChange} className={inputClasses} />
                   </div>
                   <div>
-                    <label className={`text-xs font-bold uppercase ${t.textMuted}`}>Organização / Instituição</label>
-                    <input type="text" name="organizacao" value={formData.organizacao || ''} onChange={handleFormChange} className={inputClasses} />
+                    <label className={`text-xs font-bold uppercase ${t.textMuted}`}>Tema Institucional</label>
+                    <input type="text" name="tema_institucional" value={formData.tema_institucional || ''} onChange={handleFormChange} className={inputClasses} />
                   </div>
                   <div>
-                    <label className={`text-xs font-bold uppercase ${t.textMuted}`}>Cargo / Posição</label>
-                    <input type="text" name="cargo" value={formData.cargo || ''} onChange={handleFormChange} className={inputClasses} />
-                  </div>
-                  <div>
-                    <label className={`text-xs font-bold uppercase ${t.textMuted}`}>Articulador(a)</label>
+                    <label className={`text-xs font-bold uppercase ${t.textMuted}`}>Articulador</label>
                     <input type="text" name="articulador" value={formData.articulador || ''} onChange={handleFormChange} className={inputClasses} />
                   </div>
                   <div>
                     <label className={`text-xs font-bold uppercase ${t.textMuted}`}>Telefone</label>
                     <input type="text" name="telefone" value={formData.telefone || ''} onChange={handleFormChange} className={inputClasses} />
                   </div>
-                  <div>
+                  <div className="md:col-span-2">
                     <label className={`text-xs font-bold uppercase ${t.textMuted}`}>E-mail</label>
                     <input type="email" name="email" value={formData.email || ''} onChange={handleFormChange} className={inputClasses} />
                   </div>
-                  <div>
-                    <label className={`text-xs font-bold uppercase ${t.textMuted}`}>Redes Sociais</label>
-                    <input type="text" name="redes_sociais" value={formData.redes_sociais || ''} onChange={handleFormChange} className={inputClasses} />
-                  </div>
-                  <div>
-                    <label className={`text-xs font-bold uppercase ${t.textMuted}`}>Prioridade</label>
-                    <select name="prioridade" value={formData.prioridade || 'Média'} onChange={handleFormChange} className={inputClasses}>
-                      <option value="Alta">Alta</option>
-                      <option value="Média">Média</option>
-                      <option value="Baixa">Baixa</option>
-                    </select>
-                  </div>
                 </div>
                 <div>
-                  <label className={`text-xs font-bold uppercase ${t.textMuted}`}>Notas Adicionais</label>
-                  <textarea name="notas" value={formData.notas || ''} onChange={handleFormChange} rows="3" className={inputClasses}></textarea>
+                  <label className={`text-xs font-bold uppercase ${t.textMuted}`}>Observações</label>
+                  <textarea name="observacoes" value={formData.observacoes || ''} onChange={handleFormChange} rows="3" className={inputClasses}></textarea>
                 </div>
 
                 <div className={`mt-6 pt-6 border-t-[3px] ${t.border} flex flex-col md:flex-row justify-between gap-4`}>
@@ -580,7 +571,7 @@ export default function App() {
                     <button onClick={() => { setIsEditMode(false); if(!formData.id) setSelectedContact(null); }} className={`${mondrianButton} ${t.inputBgAlt} ${t.text} w-full md:w-auto`}>
                       Cancelar
                     </button>
-                    <button onClick={handleSaveContact} disabled={isLoading || !formData.nome} className={`${mondrianButton} bg-[#007577] text-white w-full md:w-auto`}>
+                    <button onClick={handleSaveContact} disabled={isLoading || !formData.lideranca} className={`${mondrianButton} bg-[#007577] text-white w-full md:w-auto`}>
                       <Icon name="save" size={20} className={isLoading ? "animate-spin" : ""} /> {isLoading ? 'Salvando...' : 'Salvar Alterações'}
                     </button>
                   </div>
@@ -589,34 +580,35 @@ export default function App() {
             ) : (
               // MODO VISUALIZAÇÃO
               <>
-                {(selectedContact.organizacao || selectedContact.cargo) && (
+                {selectedContact.area_de_atuacao && (
                   <div className={`mb-6 p-4 ${t.inputBgAlt} border-2 ${t.border} rounded-lg flex items-center gap-3`}>
                     <span className="text-[#DCAE1D]"><Icon name="briefcase" size={28} /></span>
                     <div>
-                      {selectedContact.organizacao && <p className={`font-bold text-lg ${t.text}`}>{selectedContact.organizacao}</p>}
-                      {selectedContact.cargo && <p className={`text-sm font-semibold ${t.textMuted}`}>{selectedContact.cargo}</p>}
+                      <p className={`font-bold text-lg ${t.text}`}>{selectedContact.area_de_atuacao}</p>
+                      <p className={`text-sm font-semibold ${t.textMuted}`}>Área de Atuação</p>
                     </div>
                   </div>
                 )}
+                
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                   <div className="space-y-4">
                     <div>
-                      <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">Endereço / Localidade</label>
+                      <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">Localização</label>
                       <p className={`font-bold flex items-start gap-2 ${t.text}`}>
                         <span className="text-[#007577] mt-1 shrink-0"><Icon name="map" size={18}/></span> 
                         <span>
-                          {selectedContact.endereco && <span className="block">{selectedContact.endereco}</span>}
-                          <span className={`text-sm ${t.textMuted}`}>{selectedContact.localidade}</span>
+                          <span className="block">{selectedContact.municipio_bairro} {selectedContact.distrito ? `/ ${selectedContact.distrito}` : ''}</span>
+                          <span className={`text-sm ${t.textMuted}`}>{selectedContact.regiao}</span>
                         </span>
                       </p>
                     </div>
                     <div>
                       <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">Telefone</label>
-                      <p className={`font-bold flex items-center gap-2 ${t.text}`}><span className="text-[#DCAE1D]"><Icon name="phone" size={18}/></span> {selectedContact.telefone}</p>
+                      <p className={`font-bold flex items-center gap-2 ${t.text}`}><span className="text-[#DCAE1D]"><Icon name="phone" size={18}/></span> {selectedContact.telefone || 'N/A'}</p>
                     </div>
                     <div>
                       <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">E-mail</label>
-                      <p className={`font-bold flex items-center gap-2 ${t.text}`}><span className="text-[#B32033]"><Icon name="mail" size={18}/></span> {selectedContact.email}</p>
+                      <p className={`font-bold flex items-center gap-2 ${t.text}`}><span className="text-[#B32033]"><Icon name="mail" size={18}/></span> {selectedContact.email || 'N/A'}</p>
                     </div>
                   </div>
                   <div className="space-y-4">
@@ -627,21 +619,19 @@ export default function App() {
                       </p>
                     </div>
                     <div>
-                      <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">Área de Atuação</label>
-                      <AtuacaoBadge atuacao={selectedContact.atuacao} />
+                      <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">Tema Principal</label>
+                      <p className={`font-bold ${t.text}`}>{selectedContact.temas || 'N/A'}</p>
                     </div>
                     <div>
-                      <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">Prioridade</label>
-                      <span className={`font-black flex items-center gap-1 ${selectedContact.prioridade === 'Alta' ? 'text-[#B32033]' : 'text-[#007577]'}`}>
-                        <Icon name="check" size={18} /> {selectedContact.prioridade}
-                      </span>
+                      <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">Tema Institucional</label>
+                      <p className={`font-bold ${t.text}`}>{selectedContact.tema_institucional || 'N/A'}</p>
                     </div>
                   </div>
                 </div>
                 <div className={`border-t-[3px] ${t.border} pt-6`}>
-                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-2">Notas</label>
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-2">Observações</label>
                   <div className={`${t.inputBgAlt} p-4 rounded-lg border-2 ${t.border} font-medium ${t.text} text-lg leading-relaxed whitespace-pre-wrap`}>
-                    {selectedContact.notas || 'Sem anotações.'}
+                    {selectedContact.observacoes || 'Sem anotações.'}
                   </div>
                 </div>
               </>
@@ -687,7 +677,7 @@ export default function App() {
             <Icon name="dashboard" size={20} /> Dashboard
           </button>
           <button onClick={() => setView('directory')} className={`${mondrianButton} ${view === 'directory' ? 'bg-[#007577] text-white' : `${t.cardBg} ${t.text}`}`}>
-            <Icon name="directory" size={20} /> Fichas e Filtros
+            <Icon name="directory" size={20} /> Diretório
           </button>
           <button onClick={() => setView('settings')} className={`${mondrianButton} ${view === 'settings' ? 'bg-[#B32033] text-white' : `${t.cardBg} ${t.text}`} ml-auto`}>
             <Icon name="settings" size={20} /> Ajustes
