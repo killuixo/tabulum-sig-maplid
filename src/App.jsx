@@ -1,5 +1,11 @@
 import React, { useState, useMemo, useEffect } from 'react';
 
+// ==========================================
+// 🔗 INSIRA AQUI A URL DO SEU GOOGLE APPS SCRIPT
+// Se preenchido, o app fará o load universal para todos os usuários
+// ==========================================
+const GOOGLE_SHEETS_WEBAPP_URL = ""; 
+
 const Icon = ({ name, size = 24, className = "" }) => {
   const icons = {
     dashboard: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4h6v6H4zm10 0h6v6h-6zM4 14h6v6H4zm10 0h6v6h-6z" />,
@@ -23,7 +29,12 @@ const Icon = ({ name, size = 24, className = "" }) => {
     sun: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />,
     moon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />,
     map: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />,
-    file: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+    file: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />,
+    plus: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />,
+    edit: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7 M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />,
+    trash: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />,
+    refresh: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />,
+    save: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
   };
   return (
     <svg 
@@ -42,18 +53,12 @@ const Icon = ({ name, size = 24, className = "" }) => {
 const INITIAL_MOCK_DATA = [
   { id: 1, nome: "João Silva Exemplo", base: "Base Florianópolis", localidade: "Centro", endereco: "Rua Exemplo, 123", atuacao: "Meio Ambiente", organizacao: "Inst. Exemplo", cargo: "Presidente", telefone: "(00) 90000-0001", email: "joao@exemplo.com", redes_sociais: "@joaoexemplo", articulador: "Assessor A", prioridade: "Alta", notas: "Liderança importante na região central." },
   { id: 2, nome: "Maria Souza Simulação", base: "Base Santa Catarina", localidade: "Joinville", endereco: "Av. Fictícia, 45", atuacao: "Mobilidade Urbana", organizacao: "Pedala Exemplo", cargo: "Coordenadora", telefone: "(00) 90000-0002", email: "maria@exemplo.com", redes_sociais: "@mariasimulacao", articulador: "Assessor B", prioridade: "Média", notas: "Organiza o coletivo da zona norte." },
-  { id: 3, nome: "Assoc. Moradores Fictícia", base: "Base Florianópolis", localidade: "Sul da Ilha", endereco: "Servidão Teste, 88", atuacao: "Direito à Cidade", organizacao: "AMO Teste", cargo: "Diretoria", telefone: "(00) 90000-0003", email: "amo@exemplo.com", redes_sociais: "@amoficticia", articulador: "Assessor A", prioridade: "Alta", notas: "Fortalecer diálogo sobre plano diretor." },
-  { id: 4, nome: "Coletivo Agrícola Teste", base: "Base Santa Catarina", localidade: "Chapecó", endereco: "Linha Rural, s/n", atuacao: "Agroecologia", organizacao: "Rede Terra", cargo: "Coletivo", telefone: "(00) 90000-0004", email: "terra@exemplo.com", redes_sociais: "@coletivoteste", articulador: "Assessor C", prioridade: "Alta", notas: "Rede de agricultores familiares." },
-  { id: 5, nome: "Ana Costa Demonstração", base: "Base Florianópolis", localidade: "Continente", endereco: "Av. Principal, 500", atuacao: "Cultura", organizacao: "Ponto Cultural", cargo: "Produtora", telefone: "(00) 90000-0005", email: "ana.costa@exemplo.com", redes_sociais: "@anacultura", articulador: "Assessor B", prioridade: "Baixa", notas: "Produtora cultural independente." },
-  { id: 6, nome: "Liderança Norte da Ilha", base: "Base Florianópolis", localidade: "Norte da Ilha", endereco: "Rodovia SC", atuacao: "Saneamento", organizacao: "Saneamento Já", cargo: "Líder", telefone: "(00) 0000-0000", email: "norte@exemplo", redes_sociais: "@norte", articulador: "Assessor C", prioridade: "Média", notas: "Pautas de balneabilidade." },
-  { id: 7, nome: "Assoc. Sul Criciúma", base: "Base Santa Catarina", localidade: "Criciúma", endereco: "Centro", atuacao: "Meio Ambiente", organizacao: "Carvão Zero", cargo: "Ativista", telefone: "(00) 0000-0000", email: "cric@exemplo", redes_sociais: "@cric", articulador: "Assessor A", prioridade: "Alta", notas: "Transição energética." },
 ];
 
-// Dicionário de Coordenadas em % para posicionar os pontos nos mapas.
 const MAP_COORDINATES = {
   SC: {
     "Florianópolis": { x: 88, y: 55 },
-    "Centro": { x: 88, y: 55 }, // Agrupa Floripa no mapa SC
+    "Centro": { x: 88, y: 55 }, 
     "Sul da Ilha": { x: 88, y: 55 },
     "Continente": { x: 88, y: 55 },
     "Norte da Ilha": { x: 88, y: 55 },
@@ -78,14 +83,27 @@ export default function App() {
   const [view, setView] = useState('dashboard');
   const [contacts, setContacts] = useState(INITIAL_MOCK_DATA);
   const [selectedContact, setSelectedContact] = useState(null);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [formData, setFormData] = useState({});
   
   const [isDarkMode, setIsDarkMode] = useState(false);
-  const [mapScope, setMapScope] = useState('SC'); // 'SC' ou 'FLN'
+  const [mapScope, setMapScope] = useState('SC');
   
   const [searchTerm, setSearchTerm] = useState('');
   const [filterBase, setFilterBase] = useState('Todas');
   const [filterAtuacao, setFilterAtuacao] = useState('Todas');
   const [filterArticulador, setFilterArticulador] = useState('Todos');
+
+  // Nuvem / Sheets API
+  const [localSyncUrl, setLocalSyncUrl] = useState(() => localStorage.getItem('tabulum_sync_url') || GOOGLE_SHEETS_WEBAPP_URL);
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Sincronizar ao iniciar (Universal App Load)
+  useEffect(() => {
+    if (localSyncUrl) {
+      syncWithCloud();
+    }
+  }, []);
 
   useEffect(() => {
     document.documentElement.style.setProperty('--border-color', isDarkMode ? '#F4F4F0' : '#1A1A1A');
@@ -103,16 +121,107 @@ export default function App() {
 
   const baseCard = `border-[3px] ${t.border} rounded-xl shadow-mondrian transition-all`;
   const mondrianCard = `${baseCard} ${t.cardBg}`;
-  const mondrianButton = `font-bold border-[3px] ${t.border} rounded-xl shadow-mondrian-btn transition-all flex items-center justify-center gap-2 px-6 py-3 cursor-pointer`;
+  const mondrianButton = `font-bold border-[3px] ${t.border} rounded-xl shadow-mondrian-btn transition-all flex items-center justify-center gap-2 px-6 py-3 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed`;
 
   const bases = ['Todas', 'Base Florianópolis', 'Base Santa Catarina'];
-  const atuacoes = ['Todas', ...new Set(contacts.map(c => c.atuacao))].sort();
+  const atuacoes = ['Todas', ...new Set(contacts.map(c => c.atuacao).filter(Boolean))].sort();
   const articuladores = ['Todos', ...new Set(contacts.map(c => c.articulador).filter(Boolean))].sort();
+
+  // === FUNÇÕES DA NUVEM (API GOOGLE SHEETS) ===
+  const syncWithCloud = async () => {
+    if (!localSyncUrl) return;
+    setIsLoading(true);
+    try {
+      const res = await fetch(localSyncUrl);
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        setContacts(data);
+      }
+    } catch (e) {
+      console.error("Erro ao sincronizar:", e);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const saveToCloud = async (action, dataPayload) => {
+    if (!localSyncUrl) return;
+    setIsLoading(true);
+    try {
+      await fetch(localSyncUrl, {
+        method: 'POST',
+        // Usar text/plain evita bloqueios agressivos de CORS Preflight (OPTIONS)
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ _action: action, ...dataPayload })
+      });
+    } catch (e) {
+      console.error("Erro ao salvar na nuvem:", e);
+      alert("Ocorreu um erro ao comunicar com a planilha. Verifique a URL do Web App.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSaveContact = async () => {
+    const isNew = !formData.id;
+    const contactToSave = { ...formData };
+    if (isNew) {
+      contactToSave.id = Date.now().toString(); // Gerar ID único
+    }
+
+    // Atualiza State Localmente
+    if (isNew) {
+      setContacts(prev => [...prev, contactToSave]);
+    } else {
+      setContacts(prev => prev.map(c => String(c.id) === String(contactToSave.id) ? contactToSave : c));
+    }
+    
+    // Atualiza na Nuvem
+    await saveToCloud('update', contactToSave);
+    
+    setSelectedContact(null);
+    setIsEditMode(false);
+  };
+
+  const handleDeleteContact = async (id) => {
+    if (!window.confirm("Tem certeza que deseja apagar esta liderança?")) return;
+    
+    // Atualiza State Localmente
+    setContacts(prev => prev.filter(c => String(c.id) !== String(id)));
+    
+    // Deleta na Nuvem
+    await saveToCloud('delete', { id });
+    
+    setSelectedContact(null);
+    setIsEditMode(false);
+  };
+
+  const openNewContactModal = () => {
+    setFormData({
+      id: '', nome: '', base: 'Base Florianópolis', localidade: '', endereco: '',
+      atuacao: '', organizacao: '', cargo: '', telefone: '', email: '',
+      redes_sociais: '', articulador: '', prioridade: 'Média', notas: ''
+    });
+    setIsEditMode(true);
+    setSelectedContact({ isNew: true });
+  };
+
+  const openEditModal = (contact) => {
+    setFormData({ ...contact });
+    setIsEditMode(true);
+  };
+
+  const handleFormChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  // === RENDERIZAÇÃO DA INTERFACE ===
 
   const filteredContacts = useMemo(() => {
     return contacts.filter(contact => {
-      const matchesSearch = contact.nome.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                            contact.localidade.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      const matchesSearch = contact.nome?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                            contact.localidade?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                             (contact.organizacao && contact.organizacao.toLowerCase().includes(searchTerm.toLowerCase()));
       const matchesBase = filterBase === 'Todas' || contact.base === filterBase;
       const matchesAtuacao = filterAtuacao === 'Todas' || contact.atuacao === filterAtuacao;
@@ -124,28 +233,20 @@ export default function App() {
   const stats = useMemo(() => {
     const floripaCount = contacts.filter(c => c.base === 'Base Florianópolis').length;
     const scCount = contacts.filter(c => c.base === 'Base Santa Catarina').length;
-    
     const atuacaoCounts = contacts.reduce((acc, curr) => {
-      acc[curr.atuacao] = (acc[curr.atuacao] || 0) + 1;
+      if(curr.atuacao) acc[curr.atuacao] = (acc[curr.atuacao] || 0) + 1;
       return acc;
     }, {});
-
     const topAtuacoes = Object.entries(atuacaoCounts).sort((a, b) => b[1] - a[1]).slice(0, 4);
     return { total: contacts.length, floripaCount, scCount, topAtuacoes };
   }, [contacts]);
 
   const renderHeatMap = () => {
-    // Calcula pontos do mapa baseado no escopo (SC ou FLN)
     const heatPoints = {};
-    
     contacts.forEach(c => {
-      // Se estamos vendo Floripa, ignora contatos do interior
       if (mapScope === 'FLN' && c.base !== 'Base Florianópolis') return;
-      
       const locName = c.localidade;
       const coords = MAP_COORDINATES[mapScope][locName];
-      
-      // Se temos coordenadas para esta localidade neste escopo, nós plotamos
       if (coords) {
         if (!heatPoints[locName]) heatPoints[locName] = { ...coords, count: 0, label: locName };
         heatPoints[locName].count += 1;
@@ -162,62 +263,31 @@ export default function App() {
             Densidade Territorial: {mapScope === 'SC' ? 'Santa Catarina' : 'Florianópolis'}
           </h3>
           <div className="flex border-[3px] border-[#F4F4F0] rounded-lg overflow-hidden shrink-0">
-            <button 
-              onClick={() => setMapScope('SC')}
-              className={`px-4 py-2 font-bold transition-colors ${mapScope === 'SC' ? 'bg-[#DCAE1D] text-[#1A1A1A]' : 'bg-transparent text-[#F4F4F0] hover:bg-gray-800'}`}
-            >
-              SC
-            </button>
+            <button onClick={() => setMapScope('SC')} className={`px-4 py-2 font-bold transition-colors ${mapScope === 'SC' ? 'bg-[#DCAE1D] text-[#1A1A1A]' : 'bg-transparent text-[#F4F4F0] hover:bg-gray-800'}`}>SC</button>
             <div className="w-[3px] bg-[#F4F4F0]"></div>
-            <button 
-              onClick={() => setMapScope('FLN')}
-              className={`px-4 py-2 font-bold transition-colors ${mapScope === 'FLN' ? 'bg-[#007577] text-white' : 'bg-transparent text-[#F4F4F0] hover:bg-gray-800'}`}
-            >
-              Floripa
-            </button>
+            <button onClick={() => setMapScope('FLN')} className={`px-4 py-2 font-bold transition-colors ${mapScope === 'FLN' ? 'bg-[#007577] text-white' : 'bg-transparent text-[#F4F4F0] hover:bg-gray-800'}`}>Floripa</button>
           </div>
         </div>
-
-        {/* CONTAINER DO MAPA (Aspect Ratio Dinâmico) */}
         <div className={`relative w-full ${mapScope === 'SC' ? 'aspect-video max-h-[500px]' : 'aspect-[3/4] max-h-[600px] max-w-[400px] mx-auto'} bg-[#2A2A2A] rounded-lg border-2 border-gray-700 overflow-hidden`}>
-          
-          {/* SVG ABSTRATO COMO BASE */}
           <svg className="absolute inset-0 w-full h-full opacity-30 pointer-events-none" preserveAspectRatio="none" viewBox="0 0 100 100">
             {mapScope === 'SC' ? (
-              // Polígono estilizado de SC
               <polygon points="5,45 35,30 65,20 85,10 95,40 98,55 90,85 75,95 55,75 25,65 5,60" fill="#007577" stroke="#F4F4F0" strokeWidth="1" strokeLinejoin="round" />
             ) : (
-              // Polígonos de Floripa (Ilha e Continente)
               <>
                 <polygon points="5,35 35,35 40,55 25,65 5,65" fill="#DCAE1D" stroke="#F4F4F0" strokeWidth="1" strokeLinejoin="round" />
                 <polygon points="45,15 65,10 75,40 85,70 70,95 55,85 50,60 40,40" fill="#007577" stroke="#F4F4F0" strokeWidth="1" strokeLinejoin="round" />
               </>
             )}
           </svg>
-
-          {/* PONTOS DE CALOR */}
           {Object.values(heatPoints).map((pt, i) => {
             const intensity = pt.count / maxCount;
-            const size = 16 + (intensity * 40); // Bolas entre 16px e 56px
+            const size = 16 + (intensity * 40); 
             const opacity = 0.5 + (intensity * 0.5);
             const color = mapScope === 'FLN' ? '#DCAE1D' : '#B32033';
-
             return (
-              <div 
-                key={i} 
-                className="absolute flex items-center justify-center transform -translate-x-1/2 -translate-y-1/2 group cursor-crosshair"
-                style={{ top: `${pt.y}%`, left: `${pt.x}%`, width: size, height: size }}
-              >
-                <div 
-                  className="absolute inset-0 rounded-full animate-pulse"
-                  style={{ backgroundColor: color, opacity: opacity * 0.5 }}
-                ></div>
-                <div 
-                  className="absolute inset-2 rounded-full border-2 border-white shadow-[0_0_10px_rgba(0,0,0,0.5)]"
-                  style={{ backgroundColor: color, opacity: opacity }}
-                ></div>
-                
-                {/* Tooltip Hover */}
+              <div key={i} className="absolute flex items-center justify-center transform -translate-x-1/2 -translate-y-1/2 group cursor-crosshair" style={{ top: `${pt.y}%`, left: `${pt.x}%`, width: size, height: size }}>
+                <div className="absolute inset-0 rounded-full animate-pulse" style={{ backgroundColor: color, opacity: opacity * 0.5 }}></div>
+                <div className="absolute inset-2 rounded-full border-2 border-white shadow-[0_0_10px_rgba(0,0,0,0.5)]" style={{ backgroundColor: color, opacity: opacity }}></div>
                 <div className="absolute top-full mt-2 w-max bg-[#F4F4F0] text-[#1A1A1A] text-xs font-bold px-2 py-1 rounded border-2 border-[#1A1A1A] opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-none shadow-md">
                   {pt.label}: {pt.count} contatos
                 </div>
@@ -229,26 +299,10 @@ export default function App() {
     );
   };
 
-  const handleExportCSV = () => {
-    const headers = ['nome', 'base', 'localidade', 'endereco', 'atuacao', 'organizacao', 'cargo', 'telefone', 'email', 'redes_sociais', 'articulador', 'prioridade', 'notas'];
-    const csvContent = "data:text/csv;charset=utf-8," + headers.join(",") + "\n" + contacts.map(c => headers.map(h => `"${c[h] || ''}"`).join(",")).join("\n");
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "TABULUM_export.csv");
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  const handleImportCSV = (e) => {
-    const file = e.target.files[0];
-    if(file) alert(`Arquivo "${file.name}" recebido.\n\nPara segurança e ausência de dependências, este app está em formato estrutural. Para carregar CSVs reais, integre uma biblioteca como PapaParse nesta função no seu ambiente final.`);
-  };
-
   const AtuacaoBadge = ({ atuacao }) => {
     let bgColor = isDarkMode ? "bg-gray-700" : "bg-gray-200";
     let textColor = t.text;
+    if (!atuacao) return null;
     if (atuacao === "Meio Ambiente" || atuacao === "Saneamento") { bgColor = "bg-[#007577]"; textColor = "text-white"; }
     else if (atuacao === "Agroecologia" || atuacao === "Direito à Cidade") { bgColor = "bg-[#DCAE1D]"; textColor = "text-[#1A1A1A]"; }
     else if (atuacao === "Cultura" || atuacao === "Educação") { bgColor = "bg-[#B32033]"; textColor = "text-white"; }
@@ -267,25 +321,15 @@ export default function App() {
           <h3 className={`text-xl font-bold mb-2 relative z-10 ${t.text}`}>Total de Lideranças</h3>
           <p className={`text-6xl font-black relative z-10 ${t.text}`}>{stats.total}</p>
         </div>
-        
-        {/* CORREÇÃO DO CARD: Forçando estilos diretos para garantir contraste e ignorando o t.cardBg */}
         <div className={`${baseCard} bg-[#007577] text-white p-6 flex flex-col justify-between`}>
-          <h3 className="text-xl font-bold mb-2 flex items-center gap-2">
-            <Icon name="mappin" /> Base Florianópolis
-          </h3>
+          <h3 className="text-xl font-bold mb-2 flex items-center gap-2"><Icon name="mappin" /> Base Florianópolis</h3>
           <p className="text-5xl font-black">{stats.floripaCount}</p>
         </div>
-
         <div className={`${baseCard} bg-[#DCAE1D] text-[#1A1A1A] p-6 flex flex-col justify-between`}>
-          <h3 className="text-xl font-bold mb-2 flex items-center gap-2">
-            <Icon name="mappin" /> Base Santa Catarina
-          </h3>
+          <h3 className="text-xl font-bold mb-2 flex items-center gap-2"><Icon name="mappin" /> Base Santa Catarina</h3>
           <p className="text-5xl font-black">{stats.scCount}</p>
         </div>
-
-        {/* MAPA DE CALOR (Ocupa a linha toda) */}
         {renderHeatMap()}
-
         <div className={`${mondrianCard} p-6 md:col-span-3`}>
           <h3 className={`text-2xl font-bold mb-6 border-b-[3px] ${t.border} pb-2 flex items-center gap-2 ${t.text}`}>
             <Icon name="barchart" /> Principais Áreas de Atuação
@@ -298,14 +342,10 @@ export default function App() {
               return (
                 <div key={nome}>
                   <div className={`flex justify-between text-sm font-bold mb-1 ${t.text}`}>
-                    <span>{nome}</span>
-                    <span>{count} contatos</span>
+                    <span>{nome}</span><span>{count} contatos</span>
                   </div>
                   <div className={`h-4 w-full ${t.inputBgAlt} rounded-full border-2 ${t.border} overflow-hidden`}>
-                    <div 
-                      className={`h-full ${colors[index % colors.length]} transition-all duration-1000 border-r-2 ${t.border}`} 
-                      style={{ width: `${percentage}%` }}
-                    ></div>
+                    <div className={`h-full ${colors[index % colors.length]} transition-all duration-1000 border-r-2 ${t.border}`} style={{ width: `${percentage}%` }}></div>
                   </div>
                 </div>
               );
@@ -318,48 +358,40 @@ export default function App() {
 
   const renderDirectory = () => (
     <div className="space-y-6 animation-fade-in">
+      <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+        <h2 className={`text-2xl font-black flex items-center gap-2 ${t.text}`}><Icon name="directory"/> Fichas Cadastradas</h2>
+        <button onClick={openNewContactModal} className={`${mondrianButton} bg-[#007577] text-white hover:-translate-y-1`}>
+          <Icon name="plus" size={20} /> Novo Contato
+        </button>
+      </div>
+
       <div className={`${mondrianCard} p-4 md:p-6 bg-[#DCAE1D] flex flex-col md:flex-row gap-4 items-end flex-wrap`}>
         <div className="w-full md:flex-1 min-w-[200px] flex flex-col gap-2">
-          <label className="font-bold text-[#1A1A1A]">Buscar Contato</label>
+          <label className="font-bold text-[#1A1A1A]">Buscar</label>
           <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-500">
-              <Icon name="search" size={20} />
-            </div>
-            <input 
-              type="text" 
-              placeholder="Nome, organização, local..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className={`w-full pl-10 pr-3 py-3 rounded-lg border-[3px] ${t.border} focus:outline-none focus:ring-2 focus:ring-[#B32033] font-medium ${t.inputBg} ${t.text}`}
-            />
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-500"><Icon name="search" size={20} /></div>
+            <input type="text" placeholder="Nome, organização..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className={`w-full pl-10 pr-3 py-3 rounded-lg border-[3px] ${t.border} focus:outline-none focus:ring-2 focus:ring-[#B32033] font-medium ${t.inputBg} ${t.text}`} />
           </div>
         </div>
-        
         <div className="w-full md:w-48 flex flex-col gap-2">
           <label className="font-bold text-[#1A1A1A]">Base</label>
           <select value={filterBase} onChange={(e) => setFilterBase(e.target.value)} className={`w-full px-3 py-3 rounded-lg border-[3px] ${t.border} font-medium ${t.inputBg} ${t.text}`}>
-            {bases.map(b => <option key={b} value={b}>{b}</option>)}
+            <option value="Todas">Todas</option>
+            <option value="Base Florianópolis">Base Florianópolis</option>
+            <option value="Base Santa Catarina">Base Santa Catarina</option>
           </select>
         </div>
-
         <div className="w-full md:w-48 flex flex-col gap-2">
           <label className="font-bold text-[#1A1A1A]">Atuação</label>
           <select value={filterAtuacao} onChange={(e) => setFilterAtuacao(e.target.value)} className={`w-full px-3 py-3 rounded-lg border-[3px] ${t.border} font-medium ${t.inputBg} ${t.text}`}>
             {atuacoes.map(a => <option key={a} value={a}>{a}</option>)}
           </select>
         </div>
-
-        <div className="w-full md:w-48 flex flex-col gap-2">
-          <label className="font-bold text-[#1A1A1A]">Articulador</label>
-          <select value={filterArticulador} onChange={(e) => setFilterArticulador(e.target.value)} className={`w-full px-3 py-3 rounded-lg border-[3px] ${t.border} font-medium ${t.inputBg} ${t.text}`}>
-            {articuladores.map(a => <option key={a} value={a}>{a}</option>)}
-          </select>
-        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredContacts.map(contact => (
-          <div key={contact.id} onClick={() => setSelectedContact(contact)} className={`${mondrianCard} hover:-translate-y-1 hover:shadow-mondrian-btn cursor-pointer flex flex-col h-full`}>
+          <div key={contact.id} onClick={() => { setSelectedContact(contact); setIsEditMode(false); }} className={`${mondrianCard} hover:-translate-y-1 hover:shadow-mondrian-btn cursor-pointer flex flex-col h-full`}>
             <div className={`h-3 w-full border-b-[3px] ${t.border} ${contact.base.includes('Florianópolis') ? 'bg-[#007577]' : 'bg-[#DCAE1D]'}`}></div>
             <div className="p-5 flex-grow flex flex-col gap-3">
               <div>
@@ -367,17 +399,10 @@ export default function App() {
                 <div className={`flex items-center text-sm font-semibold gap-1 mb-1 ${t.textMuted}`}>
                   <span className="text-[#B32033]"><Icon name="mappin" size={14} /></span> {contact.localidade}
                 </div>
-                {contact.articulador && (
-                  <div className={`flex items-center text-xs font-bold gap-1 mt-1 ${t.textMuted}`}>
-                    <span className="text-[#007577]"><Icon name="usercheck" size={14} /></span> Articulador: {contact.articulador}
-                  </div>
-                )}
               </div>
               <div className={`mt-auto pt-4 border-t-2 border-dashed ${isDarkMode ? 'border-gray-700' : 'border-gray-300'} flex flex-wrap gap-2 items-center justify-between`}>
                 <AtuacaoBadge atuacao={contact.atuacao} />
-                <button className={`p-2 ${t.inputBgAlt} border-2 ${t.border} rounded-md hover:bg-[#B32033] hover:text-white transition-colors ${t.text}`}>
-                  <Icon name="chevronright" size={18} />
-                </button>
+                <button className={`p-2 ${t.inputBgAlt} border-2 ${t.border} rounded-md hover:bg-[#B32033] hover:text-white transition-colors ${t.text}`}><Icon name="chevronright" size={18} /></button>
               </div>
             </div>
           </div>
@@ -399,6 +424,40 @@ export default function App() {
           <span className="text-[#B32033]"><Icon name="settings" size={32} /></span> Ajustes do Sistema
         </h2>
 
+        {/* NUVEM / SINCRONIZAÇÃO */}
+        <div className={`mb-10 p-6 border-[3px] ${t.border} rounded-xl ${t.inputBgAlt}`}>
+          <h3 className={`text-xl font-bold mb-4 flex items-center gap-2 ${t.text}`}>
+             <Icon name="refresh" size={24} className="text-[#007577]" /> Sincronização Google Sheets
+          </h3>
+          <p className={`mb-4 text-sm font-medium ${t.textMuted}`}>
+            Insira a URL do Google Apps Script (Web App) para salvar e puxar dados da planilha automaticamente.
+          </p>
+          <div className="flex flex-col md:flex-row gap-4 mb-4">
+            <input 
+              type="text" 
+              value={localSyncUrl} 
+              onChange={(e) => {
+                setLocalSyncUrl(e.target.value);
+                localStorage.setItem('tabulum_sync_url', e.target.value);
+              }}
+              placeholder="https://script.google.com/macros/s/..." 
+              className={`flex-grow px-4 py-3 rounded-lg border-[3px] ${t.border} font-medium ${t.inputBg} ${t.text} focus:outline-none focus:ring-2 focus:ring-[#B32033]`}
+            />
+            <button 
+              onClick={syncWithCloud} 
+              disabled={isLoading || !localSyncUrl}
+              className={`${mondrianButton} bg-[#007577] text-white shrink-0`}
+            >
+              <Icon name="refresh" size={20} className={isLoading ? "animate-spin" : ""} /> {isLoading ? 'Aguarde...' : 'Sincronizar Agora'}
+            </button>
+          </div>
+          {GOOGLE_SHEETS_WEBAPP_URL && (
+            <div className={`text-xs font-bold text-[#DCAE1D] p-2 bg-[#1A1A1A] rounded border border-[#DCAE1D] mt-2`}>
+              INFO: URL Global Padrão detectada no código-fonte.
+            </div>
+          )}
+        </div>
+
         <div className={`mb-10 p-6 border-[3px] ${t.border} rounded-xl ${t.inputBgAlt}`}>
           <h3 className={`text-xl font-bold mb-4 ${t.text}`}>Aparência</h3>
           <button onClick={() => setIsDarkMode(!isDarkMode)} className={`${mondrianButton} ${t.cardBg} ${t.text} w-full md:w-auto`}>
@@ -406,115 +465,187 @@ export default function App() {
             Alternar para Tema {isDarkMode ? 'Claro' : 'Escuro'}
           </button>
         </div>
-
-        <div className={`p-6 border-[3px] ${t.border} rounded-xl ${t.inputBgAlt}`}>
-          <h3 className={`text-xl font-bold mb-6 flex items-center gap-2 ${t.text}`}>
-            <span className="text-[#007577]"><Icon name="file" size={24} /></span> Gerenciamento de Dados (CSV)
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className={`flex flex-col gap-4 p-6 border-[3px] border-dashed ${t.border} rounded-xl ${t.cardBg}`}>
-              <div>
-                <h4 className={`font-bold text-lg ${t.text}`}>Exportar Planilha</h4>
-                <p className={`text-sm mt-1 ${t.textMuted}`}>Baixe o banco de dados atual.</p>
-              </div>
-              <button onClick={handleExportCSV} className={`${mondrianButton} bg-[#007577] text-white mt-auto hover:bg-[#005e5f]`}>
-                <Icon name="download" size={20} /> Baixar CSV
-              </button>
-            </div>
-            <div className={`flex flex-col gap-4 p-6 border-[3px] border-dashed ${t.border} rounded-xl ${t.cardBg}`}>
-              <div>
-                <h4 className={`font-bold text-lg ${t.text}`}>Importar Planilha</h4>
-                <p className={`text-sm mt-1 ${t.textMuted}`}>Envie um arquivo .csv atualizado.</p>
-              </div>
-              <div className="mt-auto relative">
-                <input type="file" accept=".csv" onChange={handleImportCSV} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
-                <div className={`${mondrianButton} bg-[#DCAE1D] text-[#1A1A1A] w-full relative z-0`}>
-                  <Icon name="upload" size={20} /> Escolher Arquivo CSV
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   );
 
   const renderModal = () => {
     if (!selectedContact) return null;
+
+    const inputClasses = `w-full px-3 py-2 mt-1 rounded border-2 ${t.border} font-medium ${t.inputBg} ${t.text} focus:outline-none focus:ring-2 focus:ring-[#B32033]`;
+
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animation-fade-in">
-        <div className={`${mondrianCard} w-full max-w-2xl max-h-[90vh] overflow-y-auto relative flex flex-col md:flex-row`}>
-          <div className={`hidden md:block w-8 border-r-[3px] ${t.border} bg-[#B32033] flex-shrink-0`}></div>
+        <div className={`${mondrianCard} w-full max-w-3xl max-h-[90vh] overflow-y-auto relative flex flex-col md:flex-row`}>
+          <div className={`hidden md:block w-8 border-r-[3px] ${t.border} ${isEditMode ? 'bg-[#DCAE1D]' : 'bg-[#B32033]'} flex-shrink-0 transition-colors`}></div>
           <div className="flex-grow p-6 md:p-8">
+            
             <div className="flex justify-between items-start mb-6">
               <div>
-                <h2 className={`text-3xl font-black mb-2 ${t.text}`}>{selectedContact.nome}</h2>
-                <div className={`flex items-center gap-2 font-bold ${t.textMuted} ${t.inputBgAlt} w-fit px-3 py-1 rounded-md border-2 ${t.border}`}>
-                  <Icon name="tag" size={16} /> {selectedContact.base}
-                </div>
+                {isEditMode ? (
+                  <h2 className={`text-2xl font-black flex items-center gap-2 ${t.text}`}><Icon name="edit"/> {formData.id ? 'Editar Contato' : 'Novo Contato'}</h2>
+                ) : (
+                  <>
+                    <h2 className={`text-3xl font-black mb-2 pr-12 ${t.text}`}>{selectedContact.nome}</h2>
+                    <div className={`flex items-center gap-2 font-bold ${t.textMuted} ${t.inputBgAlt} w-fit px-3 py-1 rounded-md border-2 ${t.border}`}>
+                      <Icon name="tag" size={16} /> {selectedContact.base}
+                    </div>
+                  </>
+                )}
               </div>
-              <button onClick={() => setSelectedContact(null)} className={`p-2 border-[3px] ${t.border} rounded-xl hover:bg-[#B32033] hover:text-white transition-colors shadow-mondrian-btn ${t.text}`}>
-                <Icon name="x" size={24} />
-              </button>
+              <div className="flex gap-2">
+                {!isEditMode && !selectedContact.isNew && (
+                  <button onClick={() => openEditModal(selectedContact)} className={`p-2 border-[3px] ${t.border} rounded-xl hover:bg-[#DCAE1D] transition-colors shadow-mondrian-btn ${t.text}`} title="Editar">
+                    <Icon name="edit" size={24} />
+                  </button>
+                )}
+                <button onClick={() => { setSelectedContact(null); setIsEditMode(false); }} className={`p-2 border-[3px] ${t.border} rounded-xl hover:bg-[#B32033] hover:text-white transition-colors shadow-mondrian-btn ${t.text}`} title="Fechar">
+                  <Icon name="x" size={24} />
+                </button>
+              </div>
             </div>
 
-            {(selectedContact.organizacao || selectedContact.cargo) && (
-              <div className={`mb-6 p-4 ${t.inputBgAlt} border-2 ${t.border} rounded-lg flex items-center gap-3`}>
-                <span className="text-[#DCAE1D]"><Icon name="briefcase" size={28} /></span>
+            {isEditMode ? (
+              // MODO EDIÇÃO
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className={`text-xs font-bold uppercase ${t.textMuted}`}>Nome Completo *</label>
+                    <input type="text" name="nome" value={formData.nome || ''} onChange={handleFormChange} className={inputClasses} required />
+                  </div>
+                  <div>
+                    <label className={`text-xs font-bold uppercase ${t.textMuted}`}>Base</label>
+                    <select name="base" value={formData.base || 'Base Florianópolis'} onChange={handleFormChange} className={inputClasses}>
+                      <option value="Base Florianópolis">Base Florianópolis</option>
+                      <option value="Base Santa Catarina">Base Santa Catarina</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className={`text-xs font-bold uppercase ${t.textMuted}`}>Localidade (Cidade/Bairro)</label>
+                    <input type="text" name="localidade" value={formData.localidade || ''} onChange={handleFormChange} className={inputClasses} />
+                  </div>
+                  <div>
+                    <label className={`text-xs font-bold uppercase ${t.textMuted}`}>Endereço Exato</label>
+                    <input type="text" name="endereco" value={formData.endereco || ''} onChange={handleFormChange} className={inputClasses} />
+                  </div>
+                  <div>
+                    <label className={`text-xs font-bold uppercase ${t.textMuted}`}>Área de Atuação</label>
+                    <input type="text" name="atuacao" value={formData.atuacao || ''} onChange={handleFormChange} placeholder="Ex: Cultura, Meio Ambiente..." className={inputClasses} />
+                  </div>
+                  <div>
+                    <label className={`text-xs font-bold uppercase ${t.textMuted}`}>Organização / Instituição</label>
+                    <input type="text" name="organizacao" value={formData.organizacao || ''} onChange={handleFormChange} className={inputClasses} />
+                  </div>
+                  <div>
+                    <label className={`text-xs font-bold uppercase ${t.textMuted}`}>Cargo / Posição</label>
+                    <input type="text" name="cargo" value={formData.cargo || ''} onChange={handleFormChange} className={inputClasses} />
+                  </div>
+                  <div>
+                    <label className={`text-xs font-bold uppercase ${t.textMuted}`}>Articulador(a)</label>
+                    <input type="text" name="articulador" value={formData.articulador || ''} onChange={handleFormChange} className={inputClasses} />
+                  </div>
+                  <div>
+                    <label className={`text-xs font-bold uppercase ${t.textMuted}`}>Telefone</label>
+                    <input type="text" name="telefone" value={formData.telefone || ''} onChange={handleFormChange} className={inputClasses} />
+                  </div>
+                  <div>
+                    <label className={`text-xs font-bold uppercase ${t.textMuted}`}>E-mail</label>
+                    <input type="email" name="email" value={formData.email || ''} onChange={handleFormChange} className={inputClasses} />
+                  </div>
+                  <div>
+                    <label className={`text-xs font-bold uppercase ${t.textMuted}`}>Redes Sociais</label>
+                    <input type="text" name="redes_sociais" value={formData.redes_sociais || ''} onChange={handleFormChange} className={inputClasses} />
+                  </div>
+                  <div>
+                    <label className={`text-xs font-bold uppercase ${t.textMuted}`}>Prioridade</label>
+                    <select name="prioridade" value={formData.prioridade || 'Média'} onChange={handleFormChange} className={inputClasses}>
+                      <option value="Alta">Alta</option>
+                      <option value="Média">Média</option>
+                      <option value="Baixa">Baixa</option>
+                    </select>
+                  </div>
+                </div>
                 <div>
-                  {selectedContact.organizacao && <p className={`font-bold text-lg ${t.text}`}>{selectedContact.organizacao}</p>}
-                  {selectedContact.cargo && <p className={`text-sm font-semibold ${t.textMuted}`}>{selectedContact.cargo}</p>}
+                  <label className={`text-xs font-bold uppercase ${t.textMuted}`}>Notas Adicionais</label>
+                  <textarea name="notas" value={formData.notas || ''} onChange={handleFormChange} rows="3" className={inputClasses}></textarea>
+                </div>
+
+                <div className={`mt-6 pt-6 border-t-[3px] ${t.border} flex flex-col md:flex-row justify-between gap-4`}>
+                  {formData.id && (
+                    <button onClick={() => handleDeleteContact(formData.id)} disabled={isLoading} className={`${mondrianButton} bg-[#B32033] text-white w-full md:w-auto`}>
+                      <Icon name="trash" size={20} /> Excluir
+                    </button>
+                  )}
+                  <div className="flex gap-4 ml-auto w-full md:w-auto">
+                    <button onClick={() => { setIsEditMode(false); if(!formData.id) setSelectedContact(null); }} className={`${mondrianButton} ${t.inputBgAlt} ${t.text} w-full md:w-auto`}>
+                      Cancelar
+                    </button>
+                    <button onClick={handleSaveContact} disabled={isLoading || !formData.nome} className={`${mondrianButton} bg-[#007577] text-white w-full md:w-auto`}>
+                      <Icon name="save" size={20} className={isLoading ? "animate-spin" : ""} /> {isLoading ? 'Salvando...' : 'Salvar Alterações'}
+                    </button>
+                  </div>
                 </div>
               </div>
+            ) : (
+              // MODO VISUALIZAÇÃO
+              <>
+                {(selectedContact.organizacao || selectedContact.cargo) && (
+                  <div className={`mb-6 p-4 ${t.inputBgAlt} border-2 ${t.border} rounded-lg flex items-center gap-3`}>
+                    <span className="text-[#DCAE1D]"><Icon name="briefcase" size={28} /></span>
+                    <div>
+                      {selectedContact.organizacao && <p className={`font-bold text-lg ${t.text}`}>{selectedContact.organizacao}</p>}
+                      {selectedContact.cargo && <p className={`text-sm font-semibold ${t.textMuted}`}>{selectedContact.cargo}</p>}
+                    </div>
+                  </div>
+                )}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">Endereço / Localidade</label>
+                      <p className={`font-bold flex items-start gap-2 ${t.text}`}>
+                        <span className="text-[#007577] mt-1 shrink-0"><Icon name="map" size={18}/></span> 
+                        <span>
+                          {selectedContact.endereco && <span className="block">{selectedContact.endereco}</span>}
+                          <span className={`text-sm ${t.textMuted}`}>{selectedContact.localidade}</span>
+                        </span>
+                      </p>
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">Telefone</label>
+                      <p className={`font-bold flex items-center gap-2 ${t.text}`}><span className="text-[#DCAE1D]"><Icon name="phone" size={18}/></span> {selectedContact.telefone}</p>
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">E-mail</label>
+                      <p className={`font-bold flex items-center gap-2 ${t.text}`}><span className="text-[#B32033]"><Icon name="mail" size={18}/></span> {selectedContact.email}</p>
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">Articulador(a)</label>
+                      <p className={`font-bold flex items-center gap-2 text-lg ${t.text}`}>
+                        <span className="text-[#B32033]"><Icon name="usercheck" size={20} /></span> {selectedContact.articulador || 'Não informado'}
+                      </p>
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">Área de Atuação</label>
+                      <AtuacaoBadge atuacao={selectedContact.atuacao} />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">Prioridade</label>
+                      <span className={`font-black flex items-center gap-1 ${selectedContact.prioridade === 'Alta' ? 'text-[#B32033]' : 'text-[#007577]'}`}>
+                        <Icon name="check" size={18} /> {selectedContact.prioridade}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div className={`border-t-[3px] ${t.border} pt-6`}>
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-2">Notas</label>
+                  <div className={`${t.inputBgAlt} p-4 rounded-lg border-2 ${t.border} font-medium ${t.text} text-lg leading-relaxed whitespace-pre-wrap`}>
+                    {selectedContact.notas || 'Sem anotações.'}
+                  </div>
+                </div>
+              </>
             )}
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-              <div className="space-y-4">
-                <div>
-                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">Endereço / Localidade</label>
-                  <p className={`font-bold flex items-start gap-2 ${t.text}`}>
-                    <span className="text-[#007577] mt-1 shrink-0"><Icon name="map" size={18}/></span> 
-                    <span>
-                      {selectedContact.endereco && <span className="block">{selectedContact.endereco}</span>}
-                      <span className={`text-sm ${t.textMuted}`}>{selectedContact.localidade}</span>
-                    </span>
-                  </p>
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">Telefone</label>
-                  <p className={`font-bold flex items-center gap-2 ${t.text}`}><span className="text-[#DCAE1D]"><Icon name="phone" size={18}/></span> {selectedContact.telefone}</p>
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">E-mail</label>
-                  <p className={`font-bold flex items-center gap-2 ${t.text}`}><span className="text-[#B32033]"><Icon name="mail" size={18}/></span> {selectedContact.email}</p>
-                </div>
-              </div>
-              <div className="space-y-4">
-                <div>
-                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">Articulador(a)</label>
-                  <p className={`font-bold flex items-center gap-2 text-lg ${t.text}`}>
-                    <span className="text-[#B32033]"><Icon name="usercheck" size={20} /></span> {selectedContact.articulador || 'Não informado'}
-                  </p>
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">Área de Atuação</label>
-                  <AtuacaoBadge atuacao={selectedContact.atuacao} />
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">Prioridade</label>
-                  <span className={`font-black flex items-center gap-1 ${selectedContact.prioridade === 'Alta' ? 'text-[#B32033]' : 'text-[#007577]'}`}>
-                    <Icon name="check" size={18} /> {selectedContact.prioridade}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className={`border-t-[3px] ${t.border} pt-6`}>
-              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-2">Notas</label>
-              <div className={`${t.inputBgAlt} p-4 rounded-lg border-2 ${t.border} font-medium ${t.text} text-lg leading-relaxed`}>
-                {selectedContact.notas}
-              </div>
-            </div>
           </div>
         </div>
       </div>
@@ -530,7 +661,7 @@ export default function App() {
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .shadow-mondrian { box-shadow: 5px 5px 0 0 var(--border-color); }
         .shadow-mondrian-btn { box-shadow: 3px 3px 0 0 var(--border-color); }
-        .shadow-mondrian-btn:active { box-shadow: 0 0 0 0 transparent; transform: translate(3px, 3px); }
+        .shadow-mondrian-btn:active:not(:disabled) { box-shadow: 0 0 0 0 transparent; transform: translate(3px, 3px); }
       `}} />
 
       <div className="max-w-6xl mx-auto">
