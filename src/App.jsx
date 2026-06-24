@@ -12,6 +12,8 @@ const GOOGLE_SHEETS_WEBAPP_URL =
 const Icon = ({ name, size = 24, className = "" }) => {
   const icons = {
     dashboard: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4h6v6H4zm10 0h6v6h-6zM4 14h6v6H4zm10 0h6v6h-6z" />,
+    grid: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4h6v6H4zm10 0h6v6h-6zM4 14h6v6H4zm10 0h6v6h-6z" />,
+    list: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />,
     directory: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zm14 10v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" />,
     settings: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065zM15 12a3 3 0 11-6 0 3 3 0 016 0z" />,
     search: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />,
@@ -100,10 +102,9 @@ export default function App() {
   
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [mapScope, setMapScope] = useState('SC');
+  const [directoryViewMode, setDirectoryViewMode] = useState('grid'); // 'grid' | 'list'
   
-  // ==========================================
   // ESTADOS DE FILTROS GLOBAIS
-  // ==========================================
   const [searchTerm, setSearchTerm] = useState('');
   const [filterBase, setFilterBase] = useState('Todas');
   const [filterTemas, setFilterTemas] = useState('Todos');
@@ -154,9 +155,6 @@ export default function App() {
   const mondrianCard = `${baseCard} ${t.cardBg}`;
   const mondrianButton = `font-bold border-[3px] ${t.border} rounded-xl shadow-mondrian-btn transition-all flex items-center justify-center gap-2 px-4 md:px-6 py-3 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed text-sm md:text-base`;
 
-  // ==========================================
-  // EXTRAÇÃO DE OPÇÕES DOS FILTROS
-  // ==========================================
   const bases = ['Todas', 'Base Florianópolis', 'Base Santa Catarina'];
   const temasExtraidos = ['Todos', ...new Set(contacts.map(c => c.temas).filter(Boolean))].sort();
   const situacoesExtraidas = ['Todas', ...new Set(contacts.map(c => c.situacao).filter(Boolean))].sort();
@@ -168,7 +166,6 @@ export default function App() {
   const regioesExtraidas = ['Todas', ...new Set(contacts.filter(c => c.base === 'Base Santa Catarina').map(c => c.regiao).filter(Boolean))].sort();
   const municipiosExtraidos = ['Todas', ...new Set(contacts.filter(c => c.base === 'Base Santa Catarina').map(c => c.municipio_bairro).filter(Boolean))].sort();
 
-  // === FUNÇÕES DA NUVEM (API GOOGLE SHEETS) ===
   const syncWithCloud = async () => {
     if (!localSyncUrl) return;
     setIsLoading(true);
@@ -265,11 +262,6 @@ export default function App() {
     }
   };
 
-  // ==========================================
-  // LÓGICA DE FILTRAGEM
-  // ==========================================
-  
-  // Filtro Global Estrutural (Baseado em Base, Territórios e Articulador)
   const activeContacts = useMemo(() => {
     return contacts.filter(contact => {
       const matchesBase = filterBase === 'Todas' || contact.base === filterBase;
@@ -282,10 +274,8 @@ export default function App() {
     });
   }, [contacts, filterBase, filterArticulador, filterRegiao, filterDistrito, filterMunicipioBairro]);
 
-  // Dashboard usa apenas os filtros estruturais (activeContacts)
   const dashboardContacts = activeContacts;
 
-  // Diretório adiciona Texto, Tema e Situação
   const filteredContacts = useMemo(() => {
     return activeContacts.filter(contact => {
       const nomeMatch = contact.lideranca?.toLowerCase().includes(searchTerm.toLowerCase());
@@ -316,14 +306,10 @@ export default function App() {
       if(curr.situacao) acc[curr.situacao] = (acc[curr.situacao] || 0) + 1;
       return acc;
     }, {});
-    const topSituacoes = Object.entries(situacaoCounts).sort((a, b) => a[0].localeCompare(b[0])); // Ordem alfabética (1, 2, 3)
+    const topSituacoes = Object.entries(situacaoCounts).sort((a, b) => a[0].localeCompare(b[0]));
 
     return { total: dashboardContacts.length, floripaCount, scCount, topTemas, topSituacoes };
   }, [dashboardContacts]);
-
-  // ==========================================
-  // COMPONENTES REUTILIZÁVEIS
-  // ==========================================
 
   const SelectFilter = ({ label, value, onChange, options, isDark = false }) => (
     <div className="w-full sm:flex-1 min-w-[140px] flex flex-col gap-1.5">
@@ -351,7 +337,7 @@ export default function App() {
     const heatPoints = {};
     dashboardContacts.forEach(c => {
       if (mapScope === 'FLN' && c.base !== 'Base Florianópolis') return;
-      if (mapScope === 'SC' && c.base !== 'Base Santa Catarina') return; // Filtra SC view tb
+      if (mapScope === 'SC' && c.base !== 'Base Santa Catarina') return; 
       const locName = c.municipio_bairro;
       const coords = MAP_COORDINATES[mapScope][locName];
       if (coords) {
@@ -409,7 +395,6 @@ export default function App() {
   const renderDashboard = () => (
     <div className="space-y-6 animation-fade-in">
       
-      {/* BARRA DE FILTROS DO DASHBOARD */}
       <div className={`p-4 md:p-6 rounded-xl border-[3px] ${t.border} ${t.cardBg} flex flex-col gap-4 shadow-mondrian`}>
         <h2 className={`text-xl md:text-2xl font-black ${t.text} flex items-center gap-2 shrink-0`}>
           <Icon name="dashboard" /> Painel de Controle
@@ -452,7 +437,6 @@ export default function App() {
         
         {renderHeatMap()}
         
-        {/* GRÁFICOS: TEMAS E SITUAÇÃO */}
         <div className="col-span-1 sm:col-span-2 lg:col-span-3 grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className={`${mondrianCard} p-6 flex flex-col`}>
             <h3 className={`text-xl md:text-2xl font-bold mb-6 border-b-[3px] ${t.border} pb-2 flex items-center gap-2 ${t.text}`}>
@@ -524,9 +508,31 @@ export default function App() {
     <div className="space-y-6 animation-fade-in">
       <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4">
         <h2 className={`text-xl md:text-2xl font-black flex items-center gap-2 ${t.text}`}><Icon name="directory"/> Diretório Base</h2>
-        <button onClick={openNewContactModal} className={`${mondrianButton} bg-[#007577] text-white hover:-translate-y-1 w-full sm:w-auto`}>
-          <Icon name="plus" size={20} /> Adicionar
-        </button>
+        
+        {/* Toggle Grid/List e Adicionar */}
+        <div className="flex gap-2 sm:gap-4 flex-col sm:flex-row w-full sm:w-auto">
+          <div className={`flex border-[3px] ${t.border} rounded-xl overflow-hidden shadow-mondrian-btn ${t.inputBgAlt} w-full sm:w-auto`}>
+            <button 
+              onClick={() => setDirectoryViewMode('grid')} 
+              className={`p-2 sm:px-4 sm:py-2 flex-1 sm:flex-none flex items-center justify-center transition-colors ${directoryViewMode === 'grid' ? 'bg-[#DCAE1D] text-[#1A1A1A]' : `bg-transparent hover:bg-gray-500/20 ${t.text}`}`}
+              title="Visualização em Grade"
+            >
+              <Icon name="grid" size={20} />
+            </button>
+            <div className={`w-[3px] ${t.border}`}></div>
+            <button 
+              onClick={() => setDirectoryViewMode('list')} 
+              className={`p-2 sm:px-4 sm:py-2 flex-1 sm:flex-none flex items-center justify-center transition-colors ${directoryViewMode === 'list' ? 'bg-[#007577] text-white' : `bg-transparent hover:bg-gray-500/20 ${t.text}`}`}
+              title="Visualização em Lista"
+            >
+              <Icon name="list" size={20} />
+            </button>
+          </div>
+
+          <button onClick={openNewContactModal} className={`${mondrianButton} bg-[#007577] text-white hover:-translate-y-1 w-full sm:w-auto`}>
+            <Icon name="plus" size={20} /> Adicionar
+          </button>
+        </div>
       </div>
 
       <div className={`${mondrianCard} p-4 md:p-6 bg-[#DCAE1D] flex flex-col gap-4`}>
@@ -561,33 +567,81 @@ export default function App() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredContacts.map(contact => (
-          <div key={contact.id} onClick={() => { setSelectedContact(contact); setIsEditMode(false); }} className={`${mondrianCard} hover:-translate-y-1 hover:shadow-mondrian-btn cursor-pointer flex flex-col h-full`}>
-            <div className={`h-3 w-full border-b-[3px] ${t.border} ${contact.base.includes('Florianópolis') ? 'bg-[#007577]' : 'bg-[#DCAE1D]'}`}></div>
-            <div className="p-4 md:p-5 flex-grow flex flex-col gap-3">
-              <div>
-                <h3 className={`text-lg md:text-xl font-bold leading-tight mb-1 line-clamp-2 ${t.text}`}>{contact.lideranca}</h3>
-                <div className={`flex items-start text-xs md:text-sm font-semibold gap-1 mb-2 ${t.textMuted}`}>
-                  <span className="text-[#B32033] mt-0.5 shrink-0"><Icon name="mappin" size={14} /></span> 
-                  <span className="line-clamp-2">{contact.municipio_bairro} {contact.distrito ? `- ${contact.distrito}` : ''}</span>
+      {filteredContacts.length === 0 ? (
+        <div className={`col-span-full py-12 px-4 text-center border-[3px] border-dashed ${t.border} rounded-xl ${t.cardBg}`}>
+          <Icon name="alert" size={48} className="mx-auto mb-4 text-[#B32033]" />
+          <h3 className={`text-xl md:text-2xl font-bold ${t.text}`}>Nenhum contato encontrado</h3>
+        </div>
+      ) : (
+        <>
+          {/* MODO GRADE (CARDS) */}
+          {directoryViewMode === 'grid' && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredContacts.map(contact => (
+                <div key={contact.id} onClick={() => { setSelectedContact(contact); setIsEditMode(false); }} className={`${mondrianCard} hover:-translate-y-1 hover:shadow-mondrian-btn cursor-pointer flex flex-col h-full`}>
+                  <div className={`h-3 w-full border-b-[3px] ${t.border} ${contact.base.includes('Florianópolis') ? 'bg-[#007577]' : 'bg-[#DCAE1D]'}`}></div>
+                  <div className="p-4 md:p-5 flex-grow flex flex-col gap-3">
+                    <div>
+                      <h3 className={`text-lg md:text-xl font-bold leading-tight mb-1 line-clamp-2 ${t.text}`}>{contact.lideranca}</h3>
+                      <div className={`flex items-start text-xs md:text-sm font-semibold gap-1 mb-2 ${t.textMuted}`}>
+                        <span className="text-[#B32033] mt-0.5 shrink-0"><Icon name="mappin" size={14} /></span> 
+                        <span className="line-clamp-2">{contact.municipio_bairro} {contact.distrito ? `- ${contact.distrito}` : ''}</span>
+                      </div>
+                      <SituacaoBadge situacao={contact.situacao} />
+                    </div>
+                    <div className={`mt-auto pt-4 border-t-2 border-dashed ${isDarkMode ? 'border-gray-700' : 'border-gray-300'} flex flex-wrap gap-2 items-center justify-between`}>
+                      <span className={`text-[10px] md:text-xs font-bold truncate max-w-[70%] ${t.textMuted}`}><Icon name="tag" size={12} className="inline mr-1"/>{contact.temas || 'S/ Tema'}</span>
+                      <button className={`p-2 ${t.inputBgAlt} border-2 ${t.border} rounded-md hover:bg-[#B32033] hover:text-white transition-colors shrink-0 ${t.text}`}><Icon name="chevronright" size={16} /></button>
+                    </div>
+                  </div>
                 </div>
-                <SituacaoBadge situacao={contact.situacao} />
-              </div>
-              <div className={`mt-auto pt-4 border-t-2 border-dashed ${isDarkMode ? 'border-gray-700' : 'border-gray-300'} flex flex-wrap gap-2 items-center justify-between`}>
-                <span className={`text-[10px] md:text-xs font-bold truncate max-w-[70%] ${t.textMuted}`}><Icon name="tag" size={12} className="inline mr-1"/>{contact.temas || 'S/ Tema'}</span>
-                <button className={`p-2 ${t.inputBgAlt} border-2 ${t.border} rounded-md hover:bg-[#B32033] hover:text-white transition-colors shrink-0 ${t.text}`}><Icon name="chevronright" size={16} /></button>
-              </div>
+              ))}
             </div>
-          </div>
-        ))}
-        {filteredContacts.length === 0 && (
-          <div className={`col-span-full py-12 px-4 text-center border-[3px] border-dashed ${t.border} rounded-xl ${t.cardBg}`}>
-            <Icon name="alert" size={48} className="mx-auto mb-4 text-[#B32033]" />
-            <h3 className={`text-xl md:text-2xl font-bold ${t.text}`}>Nenhum contato encontrado</h3>
-          </div>
-        )}
-      </div>
+          )}
+
+          {/* MODO LISTA (LINHAS) */}
+          {directoryViewMode === 'list' && (
+            <div className="flex flex-col gap-3">
+              {filteredContacts.map(contact => (
+                <div key={contact.id} onClick={() => { setSelectedContact(contact); setIsEditMode(false); }} className={`${mondrianCard} relative overflow-hidden hover:-translate-y-1 hover:shadow-mondrian-btn cursor-pointer p-4 md:p-0 flex flex-col md:flex-row md:items-center gap-3 md:gap-0`}>
+                  
+                  {/* Barra de Cor (Topo no Celular, Lateral no Desktop) */}
+                  <div className={`h-2 w-full md:w-3 md:h-full absolute left-0 top-0 md:bottom-0 ${contact.base.includes('Florianópolis') ? 'bg-[#007577]' : 'bg-[#DCAE1D]'}`}></div>
+
+                  <div className="md:pl-6 md:pr-4 md:py-4 flex-1 mt-2 md:mt-0">
+                    <h3 className={`text-base md:text-lg font-bold leading-tight mb-1 truncate ${t.text}`}>{contact.lideranca}</h3>
+                    <div className={`flex items-start text-[10px] md:text-xs font-semibold gap-1 ${t.textMuted}`}>
+                      <span className="text-[#B32033] mt-0.5 shrink-0"><Icon name="mappin" size={12} /></span> 
+                      <span className="truncate">{contact.municipio_bairro} {contact.distrito ? `- ${contact.distrito}` : ''}</span>
+                    </div>
+                  </div>
+
+                  <div className="md:px-4 md:py-4 flex-1 hidden sm:block border-t-2 md:border-t-0 md:border-l-2 border-dashed border-gray-300 dark:border-gray-700">
+                    <span className={`text-[10px] md:text-xs font-bold truncate block ${t.textMuted}`}>Tema</span>
+                    <span className={`text-xs md:text-sm font-bold truncate block ${t.text}`}><Icon name="tag" size={12} className="inline mr-1"/>{contact.temas || 'S/ Tema'}</span>
+                  </div>
+
+                  <div className="md:px-4 md:py-4 md:w-48 shrink-0 flex items-center">
+                    <SituacaoBadge situacao={contact.situacao} />
+                  </div>
+
+                  <div className="md:px-4 md:py-4 md:w-40 shrink-0 hidden md:block border-l-2 border-dashed border-gray-300 dark:border-gray-700">
+                     <span className={`text-[10px] md:text-xs font-bold truncate block ${t.textMuted}`}>Articulador</span>
+                     <span className={`text-xs font-bold truncate flex items-center gap-1 ${t.text}`}>
+                        <Icon name="usercheck" size={14} className="text-[#007577]" /> {contact.articulador || 'N/A'}
+                     </span>
+                  </div>
+
+                  <div className="md:px-4 md:py-4 shrink-0 hidden md:flex items-center justify-center">
+                     <button className={`p-2 ${t.inputBgAlt} border-2 ${t.border} rounded-md hover:bg-[#B32033] hover:text-white transition-colors ${t.text}`}><Icon name="chevronright" size={16} /></button>
+                  </div>
+
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 
@@ -903,7 +957,6 @@ export default function App() {
 
       {renderModal()}
       
-      {/* Dialogos de Alerta/Confirm nativos para evitar bloqueios em mobile */}
       {dialog && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animation-fade-in">
           <div className={`${mondrianCard} w-full max-w-sm p-6 text-center shadow-2xl`}>
