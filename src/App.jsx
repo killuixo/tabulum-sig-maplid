@@ -4,8 +4,9 @@ import React, { useState, useMemo, useEffect } from 'react';
 // 🔗 CONFIGURAÇÃO DE URL SEGURA (VARIÁVEIS DE AMBIENTE)
 // ==========================================
 const GOOGLE_SHEETS_WEBAPP_URL = 
-  (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_SHEETS_URL) || 
   (typeof process !== 'undefined' && process.env && process.env.REACT_APP_SHEETS_URL) || 
+  (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_SHEETS_URL) || 
+  (typeof process !== 'undefined' && process.env && process.env.NEXT_PUBLIC_SHEETS_URL) || 
   ""; 
 
 const Icon = ({ name, size = 24, className = "" }) => {
@@ -95,17 +96,24 @@ export default function App() {
   const [selectedContact, setSelectedContact] = useState(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [formData, setFormData] = useState({});
-  const [dialog, setDialog] = useState(null); // Substitui window.confirm e alert
+  const [dialog, setDialog] = useState(null); 
   
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [mapScope, setMapScope] = useState('SC');
   
-  // Filtros unificados
+  // ==========================================
+  // ESTADOS DE FILTROS GLOBAIS
+  // ==========================================
   const [searchTerm, setSearchTerm] = useState('');
   const [filterBase, setFilterBase] = useState('Todas');
   const [filterTemas, setFilterTemas] = useState('Todos');
   const [filterSituacao, setFilterSituacao] = useState('Todas');
   const [filterArticulador, setFilterArticulador] = useState('Todos');
+  
+  // Filtros Condicionais Territoriais
+  const [filterDistrito, setFilterDistrito] = useState('Todos');
+  const [filterRegiao, setFilterRegiao] = useState('Todas');
+  const [filterMunicipioBairro, setFilterMunicipioBairro] = useState('Todas');
 
   const [isSettingsUnlocked, setIsSettingsUnlocked] = useState(false);
   const [settingsPasswordInput, setSettingsPasswordInput] = useState('');
@@ -121,6 +129,17 @@ export default function App() {
     document.documentElement.style.setProperty('--border-color', isDarkMode ? '#F4F4F0' : '#1A1A1A');
   }, [isDarkMode]);
 
+  // Reseta os sub-filtros territoriais sempre que a Base mudar
+  useEffect(() => {
+    setFilterDistrito('Todos');
+    setFilterRegiao('Todas');
+    setFilterMunicipioBairro('Todas');
+    
+    // Auto-Ajusta o Mapa
+    if (filterBase === 'Base Florianópolis') setMapScope('FLN');
+    else if (filterBase === 'Base Santa Catarina') setMapScope('SC');
+  }, [filterBase]);
+
   const t = {
     bgApp: isDarkMode ? 'bg-[#121212]' : 'bg-[#F4F4F0]',
     text: isDarkMode ? 'text-[#F4F4F0]' : 'text-[#1A1A1A]',
@@ -133,14 +152,23 @@ export default function App() {
 
   const baseCard = `border-[3px] ${t.border} rounded-xl shadow-mondrian transition-all`;
   const mondrianCard = `${baseCard} ${t.cardBg}`;
-  // Modificado: removido w-full da base do botão para flexibilidade nos Grids
-  const mondrianButton = `font-bold border-[3px] ${t.border} rounded-xl shadow-mondrian-btn transition-all flex items-center justify-center gap-2 px-4 py-3 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed`;
+  const mondrianButton = `font-bold border-[3px] ${t.border} rounded-xl shadow-mondrian-btn transition-all flex items-center justify-center gap-2 px-4 md:px-6 py-3 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed text-sm md:text-base`;
 
+  // ==========================================
+  // EXTRAÇÃO DE OPÇÕES DOS FILTROS
+  // ==========================================
   const bases = ['Todas', 'Base Florianópolis', 'Base Santa Catarina'];
   const temasExtraidos = ['Todos', ...new Set(contacts.map(c => c.temas).filter(Boolean))].sort();
   const situacoesExtraidas = ['Todas', ...new Set(contacts.map(c => c.situacao).filter(Boolean))].sort();
   const articuladoresExtraidos = ['Todos', ...new Set(contacts.map(c => c.articulador).filter(Boolean))].sort();
+  
+  // Condicionais baseados nos contatos totais da base específica
+  const distritosExtraidos = ['Todos', ...new Set(contacts.filter(c => c.base === 'Base Florianópolis').map(c => c.distrito).filter(Boolean))].sort();
+  const bairrosExtraidos = ['Todas', ...new Set(contacts.filter(c => c.base === 'Base Florianópolis').map(c => c.municipio_bairro).filter(Boolean))].sort();
+  const regioesExtraidas = ['Todas', ...new Set(contacts.filter(c => c.base === 'Base Santa Catarina').map(c => c.regiao).filter(Boolean))].sort();
+  const municipiosExtraidos = ['Todas', ...new Set(contacts.filter(c => c.base === 'Base Santa Catarina').map(c => c.municipio_bairro).filter(Boolean))].sort();
 
+  // === FUNÇÕES DA NUVEM (API GOOGLE SHEETS) ===
   const syncWithCloud = async () => {
     if (!localSyncUrl) return;
     setIsLoading(true);
@@ -237,42 +265,93 @@ export default function App() {
     }
   };
 
-  const filteredContacts = useMemo(() => {
+  // ==========================================
+  // LÓGICA DE FILTRAGEM
+  // ==========================================
+  
+  // Filtro Global Estrutural (Baseado em Base, Territórios e Articulador)
+  const activeContacts = useMemo(() => {
     return contacts.filter(contact => {
+      const matchesBase = filterBase === 'Todas' || contact.base === filterBase;
+      const matchesArticulador = filterArticulador === 'Todos' || contact.articulador === filterArticulador;
+      const matchesRegiao = filterRegiao === 'Todas' || contact.regiao === filterRegiao;
+      const matchesDistrito = filterDistrito === 'Todos' || contact.distrito === filterDistrito;
+      const matchesMunBairro = filterMunicipioBairro === 'Todas' || contact.municipio_bairro === filterMunicipioBairro;
+      
+      return matchesBase && matchesArticulador && matchesRegiao && matchesDistrito && matchesMunBairro;
+    });
+  }, [contacts, filterBase, filterArticulador, filterRegiao, filterDistrito, filterMunicipioBairro]);
+
+  // Dashboard usa apenas os filtros estruturais (activeContacts)
+  const dashboardContacts = activeContacts;
+
+  // Diretório adiciona Texto, Tema e Situação
+  const filteredContacts = useMemo(() => {
+    return activeContacts.filter(contact => {
       const nomeMatch = contact.lideranca?.toLowerCase().includes(searchTerm.toLowerCase());
       const localMatch = contact.municipio_bairro?.toLowerCase().includes(searchTerm.toLowerCase());
       const areaMatch = contact.area_de_atuacao?.toLowerCase().includes(searchTerm.toLowerCase());
-      
       const matchesSearch = nomeMatch || localMatch || areaMatch;
-      const matchesBase = filterBase === 'Todas' || contact.base === filterBase;
+      
       const matchesTemas = filterTemas === 'Todos' || contact.temas === filterTemas;
       const matchesSituacao = filterSituacao === 'Todas' || contact.situacao === filterSituacao;
-      const matchesArticulador = filterArticulador === 'Todos' || contact.articulador === filterArticulador;
       
-      return matchesSearch && matchesBase && matchesTemas && matchesSituacao && matchesArticulador;
+      return matchesSearch && matchesTemas && matchesSituacao;
     });
-  }, [contacts, searchTerm, filterBase, filterTemas, filterSituacao, filterArticulador]);
-
-  const dashboardContacts = useMemo(() => {
-    if (filterArticulador === 'Todos') return contacts;
-    return contacts.filter(c => c.articulador === filterArticulador);
-  }, [contacts, filterArticulador]);
+  }, [activeContacts, searchTerm, filterTemas, filterSituacao]);
 
   const stats = useMemo(() => {
     const floripaCount = dashboardContacts.filter(c => c.base === 'Base Florianópolis').length;
     const scCount = dashboardContacts.filter(c => c.base === 'Base Santa Catarina').length;
+    
+    // Temas
     const temaCounts = dashboardContacts.reduce((acc, curr) => {
       if(curr.temas) acc[curr.temas] = (acc[curr.temas] || 0) + 1;
       return acc;
     }, {});
-    const topTemas = Object.entries(temaCounts).sort((a, b) => b[1] - a[1]).slice(0, 4);
-    return { total: dashboardContacts.length, floripaCount, scCount, topTemas };
+    const topTemas = Object.entries(temaCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+
+    // Situação
+    const situacaoCounts = dashboardContacts.reduce((acc, curr) => {
+      if(curr.situacao) acc[curr.situacao] = (acc[curr.situacao] || 0) + 1;
+      return acc;
+    }, {});
+    const topSituacoes = Object.entries(situacaoCounts).sort((a, b) => a[0].localeCompare(b[0])); // Ordem alfabética (1, 2, 3)
+
+    return { total: dashboardContacts.length, floripaCount, scCount, topTemas, topSituacoes };
   }, [dashboardContacts]);
+
+  // ==========================================
+  // COMPONENTES REUTILIZÁVEIS
+  // ==========================================
+
+  const SelectFilter = ({ label, value, onChange, options, isDark = false }) => (
+    <div className="w-full sm:flex-1 min-w-[140px] flex flex-col gap-1.5">
+      <label className={`font-bold text-xs md:text-sm uppercase tracking-wide ${isDark ? 'text-[#1A1A1A]' : t.textMuted}`}>{label}</label>
+      <select 
+        value={value} 
+        onChange={onChange} 
+        className={`w-full px-3 py-2.5 rounded-lg border-[3px] ${t.border} font-medium ${t.inputBg} ${t.text} truncate focus:outline-none focus:ring-2 focus:ring-[#B32033] shadow-sm`}
+      >
+        {options.map(o => <option key={o} value={o}>{o}</option>)}
+      </select>
+    </div>
+  );
+
+  const SituacaoBadge = ({ situacao }) => {
+    if (!situacao) return null;
+    let cor = isDarkMode ? "bg-gray-700 text-white" : "bg-gray-200 text-[#1A1A1A]";
+    if (situacao.includes("4 -")) cor = "bg-[#007577] text-white";
+    else if (situacao.includes("3 -")) cor = "bg-[#DCAE1D] text-[#1A1A1A]";
+    else if (situacao.includes("1 -") || situacao.includes("2 -")) cor = "bg-[#B32033] text-white";
+    return <span className={`px-2 py-1 text-[10px] md:text-xs font-bold rounded-md border-2 ${t.border} ${cor} truncate max-w-full block`}>{situacao}</span>;
+  };
 
   const renderHeatMap = () => {
     const heatPoints = {};
     dashboardContacts.forEach(c => {
       if (mapScope === 'FLN' && c.base !== 'Base Florianópolis') return;
+      if (mapScope === 'SC' && c.base !== 'Base Santa Catarina') return; // Filtra SC view tb
       const locName = c.municipio_bairro;
       const coords = MAP_COORDINATES[mapScope][locName];
       if (coords) {
@@ -327,38 +406,39 @@ export default function App() {
     );
   };
 
-  const SituacaoBadge = ({ situacao }) => {
-    if (!situacao) return null;
-    let cor = isDarkMode ? "bg-gray-700 text-white" : "bg-gray-200 text-[#1A1A1A]";
-    if (situacao.includes("4 -")) cor = "bg-[#007577] text-white";
-    else if (situacao.includes("3 -")) cor = "bg-[#DCAE1D] text-[#1A1A1A]";
-    else if (situacao.includes("1 -")) cor = "bg-[#B32033] text-white";
-    return <span className={`px-2 py-1 text-xs font-bold rounded-md border-2 ${t.border} ${cor} truncate max-w-full block`}>{situacao}</span>;
-  };
-
   const renderDashboard = () => (
     <div className="space-y-6 animation-fade-in">
       
-      <div className={`p-4 md:p-6 rounded-xl border-[3px] ${t.border} ${t.cardBg} flex flex-col lg:flex-row justify-between items-stretch lg:items-center gap-4 shadow-mondrian`}>
+      {/* BARRA DE FILTROS DO DASHBOARD */}
+      <div className={`p-4 md:p-6 rounded-xl border-[3px] ${t.border} ${t.cardBg} flex flex-col gap-4 shadow-mondrian`}>
         <h2 className={`text-xl md:text-2xl font-black ${t.text} flex items-center gap-2 shrink-0`}>
-          <Icon name="dashboard" /> Visão Geral
+          <Icon name="dashboard" /> Painel de Controle
         </h2>
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 w-full lg:w-auto">
-          <label className={`font-bold ${t.textMuted} text-sm shrink-0`}>Filtrar Articulador:</label>
-          <select 
-            value={filterArticulador} 
-            onChange={(e) => setFilterArticulador(e.target.value)} 
-            className={`w-full sm:w-56 px-3 py-2 rounded-lg border-2 ${t.border} font-medium ${t.inputBg} ${t.text} truncate`}
-          >
-            {articuladoresExtraidos.map(a => <option key={a} value={a}>{a}</option>)}
-          </select>
+        <div className="flex flex-col sm:flex-row flex-wrap gap-4 items-end">
+          <SelectFilter label="Base" value={filterBase} onChange={e => setFilterBase(e.target.value)} options={bases} />
+          
+          {filterBase === 'Base Florianópolis' && (
+            <>
+              <SelectFilter label="Distrito" value={filterDistrito} onChange={e => setFilterDistrito(e.target.value)} options={distritosExtraidos} />
+              <SelectFilter label="Bairro" value={filterMunicipioBairro} onChange={e => setFilterMunicipioBairro(e.target.value)} options={bairrosExtraidos} />
+            </>
+          )}
+
+          {filterBase === 'Base Santa Catarina' && (
+            <>
+              <SelectFilter label="Região" value={filterRegiao} onChange={e => setFilterRegiao(e.target.value)} options={regioesExtraidas} />
+              <SelectFilter label="Município" value={filterMunicipioBairro} onChange={e => setFilterMunicipioBairro(e.target.value)} options={municipiosExtraidos} />
+            </>
+          )}
+
+          <SelectFilter label="Articulador" value={filterArticulador} onChange={e => setFilterArticulador(e.target.value)} options={articuladoresExtraidos} />
         </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         <div className={`${mondrianCard} p-6 flex flex-col justify-between overflow-hidden relative sm:col-span-2 lg:col-span-1`}>
           <div className={`absolute top-0 right-0 w-16 h-16 bg-[#B32033] border-l-[3px] border-b-[3px] ${t.border} rounded-bl-xl`}></div>
-          <h3 className={`text-xl font-bold mb-2 relative z-10 ${t.text}`}>Total de Lideranças</h3>
+          <h3 className={`text-xl font-bold mb-2 relative z-10 ${t.text}`}>Total Filtrado</h3>
           <p className={`text-6xl font-black relative z-10 ${t.text}`}>{stats.total}</p>
         </div>
         <div className={`${baseCard} bg-[#007577] text-white p-6 flex flex-col justify-between`}>
@@ -372,33 +452,70 @@ export default function App() {
         
         {renderHeatMap()}
         
-        <div className={`${mondrianCard} p-6 lg:col-span-3`}>
-          <h3 className={`text-xl md:text-2xl font-bold mb-6 border-b-[3px] ${t.border} pb-2 flex items-center gap-2 ${t.text}`}>
-            <Icon name="barchart" /> Principais Temas
-          </h3>
-          {stats.topTemas.length > 0 ? (
-            <div className="space-y-4 max-w-full lg:max-w-3xl">
-              {stats.topTemas.map(([nome, count], index) => {
-                const max = Math.max(...stats.topTemas.map(t => t[1]));
-                const percentage = (count / max) * 100;
-                const colors = ['bg-[#B32033]', 'bg-[#007577]', 'bg-[#DCAE1D]', isDarkMode ? 'bg-gray-400' : 'bg-[#1A1A1A]'];
-                return (
-                  <div key={nome}>
-                    <div className={`flex justify-between text-sm font-bold mb-1 ${t.text}`}>
-                      <span className="truncate pr-4">{nome}</span>
-                      <span className="shrink-0">{count} conts.</span>
+        {/* GRÁFICOS: TEMAS E SITUAÇÃO */}
+        <div className="col-span-1 sm:col-span-2 lg:col-span-3 grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className={`${mondrianCard} p-6 flex flex-col`}>
+            <h3 className={`text-xl md:text-2xl font-bold mb-6 border-b-[3px] ${t.border} pb-2 flex items-center gap-2 ${t.text}`}>
+              <Icon name="barchart" /> Principais Temas
+            </h3>
+            {stats.topTemas.length > 0 ? (
+              <div className="space-y-4">
+                {stats.topTemas.map(([nome, count], index) => {
+                  const max = Math.max(...stats.topTemas.map(t => t[1]));
+                  const percentage = (count / max) * 100;
+                  const colors = ['bg-[#B32033]', 'bg-[#007577]', 'bg-[#DCAE1D]', isDarkMode ? 'bg-gray-400' : 'bg-[#1A1A1A]'];
+                  return (
+                    <div key={nome}>
+                      <div className={`flex justify-between text-sm font-bold mb-1 ${t.text}`}>
+                        <span className="truncate pr-4">{nome}</span>
+                        <span className="shrink-0">{count} conts.</span>
+                      </div>
+                      <div className={`h-4 w-full ${t.inputBgAlt} rounded-full border-2 ${t.border} overflow-hidden`}>
+                        <div className={`h-full ${colors[index % colors.length]} transition-all duration-1000 border-r-2 ${t.border}`} style={{ width: `${percentage}%` }}></div>
+                      </div>
                     </div>
-                    <div className={`h-4 w-full ${t.inputBgAlt} rounded-full border-2 ${t.border} overflow-hidden`}>
-                      <div className={`h-full ${colors[index % colors.length]} transition-all duration-1000 border-r-2 ${t.border}`} style={{ width: `${percentage}%` }}></div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className={`font-medium ${t.textMuted} mt-auto`}>Não há temas associados a este filtro.</p>
+            )}
+          </div>
+
+          <div className={`${mondrianCard} p-6 flex flex-col`}>
+            <h3 className={`text-xl md:text-2xl font-bold mb-6 border-b-[3px] ${t.border} pb-2 flex items-center gap-2 ${t.text}`}>
+              <Icon name="check" /> Status de Alinhamento
+            </h3>
+            {stats.topSituacoes.length > 0 ? (
+              <div className="space-y-4">
+                {stats.topSituacoes.map(([nome, count]) => {
+                  const max = Math.max(...stats.topSituacoes.map(t => t[1]));
+                  const percentage = (count / max) * 100;
+                  
+                  let colorClass = isDarkMode ? 'bg-gray-400' : 'bg-gray-700';
+                  if (nome.includes('4 -')) colorClass = 'bg-[#007577]';
+                  else if (nome.includes('3 -')) colorClass = 'bg-[#DCAE1D]';
+                  else if (nome.includes('1 -') || nome.includes('2 -')) colorClass = 'bg-[#B32033]';
+
+                  return (
+                    <div key={nome}>
+                      <div className={`flex justify-between text-sm font-bold mb-1 ${t.text}`}>
+                        <span className="truncate pr-4">{nome}</span>
+                        <span className="shrink-0">{count} conts.</span>
+                      </div>
+                      <div className={`h-4 w-full ${t.inputBgAlt} rounded-full border-2 ${t.border} overflow-hidden`}>
+                        <div className={`h-full ${colorClass} transition-all duration-1000 border-r-2 ${t.border}`} style={{ width: `${percentage}%` }}></div>
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <p className={`font-medium ${t.textMuted}`}>Não há temas suficientes associados a este filtro.</p>
-          )}
+                  );
+                })}
+              </div>
+            ) : (
+              <p className={`font-medium ${t.textMuted} mt-auto`}>Sem dados de situação para exibir.</p>
+            )}
+          </div>
         </div>
+
       </div>
     </div>
   );
@@ -412,37 +529,35 @@ export default function App() {
         </button>
       </div>
 
-      <div className={`${mondrianCard} p-4 md:p-6 bg-[#DCAE1D] flex flex-col md:flex-row gap-4 items-stretch md:items-end flex-wrap`}>
-        <div className="w-full md:flex-1 min-w-[200px] flex flex-col gap-2">
-          <label className="font-bold text-[#1A1A1A] text-sm md:text-base">Buscar</label>
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-500"><Icon name="search" size={20} /></div>
-            <input type="text" placeholder="Nome, área, local..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className={`w-full pl-10 pr-3 py-3 rounded-lg border-[3px] ${t.border} focus:outline-none focus:ring-2 focus:ring-[#B32033] font-medium ${t.inputBg} ${t.text}`} />
+      <div className={`${mondrianCard} p-4 md:p-6 bg-[#DCAE1D] flex flex-col gap-4`}>
+        <div className="flex flex-col md:flex-row gap-4 items-end flex-wrap">
+          <div className="w-full md:flex-1 min-w-[200px] flex flex-col gap-1.5">
+            <label className="font-bold text-[#1A1A1A] text-xs md:text-sm uppercase tracking-wide">Buscar</label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-500"><Icon name="search" size={20} /></div>
+              <input type="text" placeholder="Nome, área..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className={`w-full pl-10 pr-3 py-2.5 rounded-lg border-[3px] ${t.border} focus:outline-none focus:ring-2 focus:ring-[#B32033] font-medium ${t.inputBg} ${t.text} shadow-sm`} />
+            </div>
           </div>
-        </div>
-        <div className="w-full sm:w-[calc(50%-0.5rem)] md:w-40 flex flex-col gap-2">
-          <label className="font-bold text-[#1A1A1A] text-sm md:text-base">Base</label>
-          <select value={filterBase} onChange={(e) => setFilterBase(e.target.value)} className={`w-full px-3 py-3 rounded-lg border-[3px] ${t.border} font-medium ${t.inputBg} ${t.text} truncate`}>
-            {bases.map(b => <option key={b} value={b}>{b}</option>)}
-          </select>
-        </div>
-        <div className="w-full sm:w-[calc(50%-0.5rem)] md:w-40 flex flex-col gap-2">
-          <label className="font-bold text-[#1A1A1A] text-sm md:text-base">Tema</label>
-          <select value={filterTemas} onChange={(e) => setFilterTemas(e.target.value)} className={`w-full px-3 py-3 rounded-lg border-[3px] ${t.border} font-medium ${t.inputBg} ${t.text} truncate`}>
-            {temasExtraidos.map(a => <option key={a} value={a}>{a}</option>)}
-          </select>
-        </div>
-        <div className="w-full sm:w-[calc(50%-0.5rem)] md:w-40 flex flex-col gap-2">
-          <label className="font-bold text-[#1A1A1A] text-sm md:text-base">Situação</label>
-          <select value={filterSituacao} onChange={(e) => setFilterSituacao(e.target.value)} className={`w-full px-3 py-3 rounded-lg border-[3px] ${t.border} font-medium ${t.inputBg} ${t.text} truncate`}>
-            {situacoesExtraidas.map(a => <option key={a} value={a}>{a}</option>)}
-          </select>
-        </div>
-        <div className="w-full sm:w-[calc(50%-0.5rem)] md:w-40 flex flex-col gap-2">
-          <label className="font-bold text-[#1A1A1A] text-sm md:text-base">Articulador</label>
-          <select value={filterArticulador} onChange={(e) => setFilterArticulador(e.target.value)} className={`w-full px-3 py-3 rounded-lg border-[3px] ${t.border} font-medium ${t.inputBg} ${t.text} truncate`}>
-            {articuladoresExtraidos.map(a => <option key={a} value={a}>{a}</option>)}
-          </select>
+          
+          <SelectFilter label="Base" value={filterBase} onChange={e => setFilterBase(e.target.value)} options={bases} isDark={true} />
+          
+          {filterBase === 'Base Florianópolis' && (
+            <>
+              <SelectFilter label="Distrito" value={filterDistrito} onChange={e => setFilterDistrito(e.target.value)} options={distritosExtraidos} isDark={true} />
+              <SelectFilter label="Bairro" value={filterMunicipioBairro} onChange={e => setFilterMunicipioBairro(e.target.value)} options={bairrosExtraidos} isDark={true} />
+            </>
+          )}
+
+          {filterBase === 'Base Santa Catarina' && (
+            <>
+              <SelectFilter label="Região" value={filterRegiao} onChange={e => setFilterRegiao(e.target.value)} options={regioesExtraidas} isDark={true} />
+              <SelectFilter label="Município" value={filterMunicipioBairro} onChange={e => setFilterMunicipioBairro(e.target.value)} options={municipiosExtraidos} isDark={true} />
+            </>
+          )}
+
+          <SelectFilter label="Tema" value={filterTemas} onChange={e => setFilterTemas(e.target.value)} options={temasExtraidos} isDark={true} />
+          <SelectFilter label="Situação" value={filterSituacao} onChange={e => setFilterSituacao(e.target.value)} options={situacoesExtraidas} isDark={true} />
+          <SelectFilter label="Articulador" value={filterArticulador} onChange={e => setFilterArticulador(e.target.value)} options={articuladoresExtraidos} isDark={true} />
         </div>
       </div>
 
@@ -460,8 +575,8 @@ export default function App() {
                 <SituacaoBadge situacao={contact.situacao} />
               </div>
               <div className={`mt-auto pt-4 border-t-2 border-dashed ${isDarkMode ? 'border-gray-700' : 'border-gray-300'} flex flex-wrap gap-2 items-center justify-between`}>
-                <span className={`text-xs font-bold truncate max-w-[70%] ${t.textMuted}`}><Icon name="tag" size={12} className="inline mr-1"/>{contact.temas || 'S/ Tema'}</span>
-                <button className={`p-2 ${t.inputBgAlt} border-2 ${t.border} rounded-md hover:bg-[#B32033] hover:text-white transition-colors shrink-0 ${t.text}`}><Icon name="chevronright" size={18} /></button>
+                <span className={`text-[10px] md:text-xs font-bold truncate max-w-[70%] ${t.textMuted}`}><Icon name="tag" size={12} className="inline mr-1"/>{contact.temas || 'S/ Tema'}</span>
+                <button className={`p-2 ${t.inputBgAlt} border-2 ${t.border} rounded-md hover:bg-[#B32033] hover:text-white transition-colors shrink-0 ${t.text}`}><Icon name="chevronright" size={16} /></button>
               </div>
             </div>
           </div>
@@ -485,7 +600,7 @@ export default function App() {
               <Icon name="lock" size={32} />
             </div>
             <h2 className={`text-xl md:text-2xl font-black mb-2 ${t.text}`}>Área Restrita</h2>
-            <p className={`mb-6 text-sm ${t.textMuted}`}>Insira a senha de administrador para acessar as configurações.</p>
+            <p className={`mb-6 text-xs md:text-sm ${t.textMuted}`}>Insira a senha de administrador para acessar as configurações.</p>
             
             <form onSubmit={handleSettingsLogin} className="flex flex-col gap-4">
               <input 
@@ -559,8 +674,7 @@ export default function App() {
 
   const renderModal = () => {
     if (!selectedContact) return null;
-
-    const inputClasses = `w-full px-3 py-2 mt-1 rounded border-2 ${t.border} font-medium ${t.inputBg} ${t.text} text-sm focus:outline-none focus:ring-2 focus:ring-[#B32033]`;
+    const inputClasses = `w-full px-3 py-2 mt-1 rounded border-2 ${t.border} font-medium ${t.inputBg} ${t.text} text-sm md:text-base focus:outline-none focus:ring-2 focus:ring-[#B32033]`;
 
     return (
       <div className="fixed inset-0 z-[50] flex items-center justify-center p-2 sm:p-4 bg-black/70 backdrop-blur-sm animation-fade-in">
@@ -789,7 +903,7 @@ export default function App() {
 
       {renderModal()}
       
-      {/* Dialogos de Alerta/Confirm (Evitando window.alert mobile blockers) */}
+      {/* Dialogos de Alerta/Confirm nativos para evitar bloqueios em mobile */}
       {dialog && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animation-fade-in">
           <div className={`${mondrianCard} w-full max-w-sm p-6 text-center shadow-2xl`}>
