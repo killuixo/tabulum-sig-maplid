@@ -1,9 +1,10 @@
 export default async function handler(req, res) {
   // A URL real do Google Script fica escondida aqui nas variáveis de ambiente da Vercel
-  const GOOGLE_SCRIPT_URL = process.env.GOOGLE_SCRIPT_URL;
+  // Atualizado para procurar a VITE_SHEETS_URL que configurou na Vercel
+  const GOOGLE_SCRIPT_URL = process.env.VITE_SHEETS_URL || process.env.GOOGLE_SCRIPT_URL;
 
   if (!GOOGLE_SCRIPT_URL) {
-    return res.status(500).json({ error: "Variável GOOGLE_SCRIPT_URL não configurada na Vercel." });
+    return res.status(500).json({ error: "Variável VITE_SHEETS_URL não configurada na Vercel." });
   }
 
   try {
