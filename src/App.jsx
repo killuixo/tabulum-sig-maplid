@@ -1,39 +1,61 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 
 // ==========================================
-// CONFIGURAÇÃO DE URL SEGURA
+// 🔗 CONFIGURAÇÃO DE URL SEGURA (VARIÁVEIS DE AMBIENTE)
 // ==========================================
-// Removida a verificação import.meta para evitar erros de compilação no Vercel (es2015 target)
 const GOOGLE_SHEETS_WEBAPP_URL = 
   (typeof process !== 'undefined' && process.env && process.env.REACT_APP_SHEETS_URL) || 
+  (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_SHEETS_URL) || 
   (typeof process !== 'undefined' && process.env && process.env.NEXT_PUBLIC_SHEETS_URL) || 
   ""; 
 
-// --- ÍCONES SVG NATIVOS ---
-const Icon = ({ path, className = "w-6 h-6", onClick, size, style }) => (
-  <svg onClick={onClick} style={{ width: size, height: size, ...style }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="square" strokeLinejoin="miter" className={className}>
-    {path}
-  </svg>
-);
-const SearchIcon = (p) => <Icon {...p} path={<><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></>} />;
-const MapPinIcon = (p) => <Icon {...p} path={<><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></>} />;
-const UserIcon = (p) => <Icon {...p} path={<><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></>} />;
-const TagIcon = (p) => <Icon {...p} path={<><path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z"/><path d="M7 7h.01"/></>} />;
-const EditIcon = (p) => <Icon {...p} path={<><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></>} />;
-const SaveIcon = (p) => <Icon {...p} path={<><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></>} />;
-const XIcon = (p) => <Icon {...p} path={<><path d="M18 6 6 18"/><path d="m6 6 12 12"/></>} />;
-const SettingsIcon = (p) => <Icon {...p} path={<><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></>} />;
-const LogInIcon = (p) => <Icon {...p} path={<><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" x2="3" y1="12" y2="12"/></>} />;
-const LogOutIcon = (p) => <Icon {...p} path={<><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></>} />;
-const CheckCircleIcon = (p) => <Icon {...p} path={<><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></>} />;
-const AlertTriangleIcon = (p) => <Icon {...p} path={<><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></>} />;
-const RefreshCwIcon = (p) => <Icon {...p} path={<><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></>} />;
-const UploadCloudIcon = (p) => <Icon {...p} path={<><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M12 12v9"/><path d="m16 16-4-4-4 4"/></>} />;
-const LayoutDashboardIcon = (p) => <Icon {...p} path={<><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></>} />;
-const TableIcon = (p) => <Icon {...p} path={<><path d="M12 3v18"/><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/></>} />;
-const BriefcaseIcon = (p) => <Icon {...p} path={<><rect width="20" height="14" x="2" y="7" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></>} />;
-const PlusIcon = (p) => <Icon {...p} path={<><path d="M5 12h14"/><path d="M12 5v14"/></>} />;
-const TrashIcon = (p) => <Icon {...p} path={<><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></>} />;
+const Icon = ({ name, size = 24, className = "" }) => {
+  const icons = {
+    dashboard: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4h6v6H4zm10 0h6v6h-6zM4 14h6v6H4zm10 0h6v6h-6z" />,
+    grid: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4h6v6H4zm10 0h6v6h-6zM4 14h6v6H4zm10 0h6v6h-6z" />,
+    list: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />,
+    directory: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zm14 10v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" />,
+    settings: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065zM15 12a3 3 0 11-6 0 3 3 0 016 0z" />,
+    search: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />,
+    users: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />,
+    mappin: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0zM15 11a3 3 0 11-6 0 3 3 0 016 0z" />,
+    phone: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />,
+    mail: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />,
+    x: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />,
+    upload: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />,
+    download: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />,
+    chevronright: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />,
+    barchart: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />,
+    tag: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />,
+    alert: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />,
+    check: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />,
+    briefcase: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />,
+    usercheck: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />,
+    sun: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />,
+    moon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />,
+    map: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />,
+    file: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />,
+    plus: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />,
+    edit: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7 M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />,
+    trash: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />,
+    refresh: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />,
+    save: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />,
+    lock: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />,
+    unlock: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
+  };
+  return (
+    <svg 
+      xmlns="http://www.w3.org/2000/svg" 
+      width={size} height={size} 
+      viewBox="0 0 24 24" 
+      fill="none" 
+      stroke="currentColor" 
+      className={className}
+    >
+      {icons[name] || icons['alert']}
+    </svg>
+  );
+};
 
 const INITIAL_MOCK_DATA = [
   { id: "mock_1", base: "Base Florianópolis", lideranca: "Fátima Lima", municipio_bairro: "Armação", regiao: "Sul", distrito: "Pântano do Sul", situacao: "3 - Pré alinhado", area_de_atuacao: "Cultura/Teatro", temas: "Cultura", tema_institucional: "FUNDO SOCIAL", articulador: "Guto", telefone: "48984692944", email: "costadelimafatima@gmail.com", observacoes: "" },
@@ -42,92 +64,127 @@ const INITIAL_MOCK_DATA = [
 
 const MAP_COORDINATES = {
   SC: {
-    "Florianópolis": { x: 88, y: 55 }, "Santo Amaro da Imperatriz": { x: 85, y: 55 },
-    "São José": { x: 87, y: 54 }, "Palhoça": { x: 86, y: 56 }, "Joinville": { x: 85, y: 20 },
-    "Chapecó": { x: 15, y: 45 }, "Criciúma": { x: 80, y: 85 }, "Lages": { x: 55, y: 65 },
-    "Blumenau": { x: 75, y: 35 }, "Itajaí": { x: 85, y: 35 }, "Garopaba": { x: 87, y: 65 }
+    "Florianópolis": { x: 88, y: 55 },
+    "Santo Amaro da Imperatriz": { x: 85, y: 55 },
+    "São José": { x: 87, y: 54 },
+    "Palhoça": { x: 86, y: 56 },
+    "Joinville": { x: 85, y: 20 },
+    "Chapecó": { x: 15, y: 45 },
+    "Criciúma": { x: 80, y: 85 },
+    "Lages": { x: 55, y: 65 },
+    "Blumenau": { x: 75, y: 35 },
+    "Itajaí": { x: 85, y: 35 },
+    "Garopaba": { x: 87, y: 65 }
   },
   FLN: {
-    "Centro": { x: 45, y: 45 }, "Sul da Ilha": { x: 55, y: 75 }, "Campeche": { x: 58, y: 70 },
-    "Armação": { x: 60, y: 85 }, "Rio Tavares": { x: 55, y: 65 }, "Norte da Ilha": { x: 50, y: 20 },
-    "Ingleses": { x: 65, y: 15 }, "Canasvieiras": { x: 45, y: 10 }, "Continente": { x: 30, y: 42 },
-    "Coqueiros": { x: 32, y: 45 }, "Lagoa da Conceição": { x: 65, y: 45 }, "Trindade": { x: 48, y: 40 }
+    "Centro": { x: 45, y: 45 },
+    "Sul da Ilha": { x: 55, y: 75 },
+    "Campeche": { x: 58, y: 70 },
+    "Armação": { x: 60, y: 85 },
+    "Rio Tavares": { x: 55, y: 65 },
+    "Norte da Ilha": { x: 50, y: 20 },
+    "Ingleses": { x: 65, y: 15 },
+    "Canasvieiras": { x: 45, y: 10 },
+    "Continente": { x: 30, y: 42 },
+    "Coqueiros": { x: 32, y: 45 },
+    "Lagoa da Conceição": { x: 65, y: 45 },
+    "Trindade": { x: 48, y: 40 }
   }
 };
 
 export default function App() {
+  const [view, setView] = useState('dashboard');
   const [contacts, setContacts] = useState(INITIAL_MOCK_DATA);
-  const [loading, setLoading] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
-  
-  // Estados de Tela Neo-Brutalistas
-  const [currentView, setCurrentView] = useState('list'); // 'list', 'dashboard', 'detail', 'edit', 'settings'
   const [selectedContact, setSelectedContact] = useState(null);
-  const [editingContact, setEditingContact] = useState(null);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [formData, setFormData] = useState({});
+  const [dialog, setDialog] = useState(null); 
   
-  // Filtros Globais
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [mapScope, setMapScope] = useState('SC');
+  const [directoryViewMode, setDirectoryViewMode] = useState('grid'); // 'grid' | 'list'
+  
+  // ESTADOS DE FILTROS GLOBAIS
   const [searchTerm, setSearchTerm] = useState('');
   const [filterBase, setFilterBase] = useState('Todas');
   const [filterTemas, setFilterTemas] = useState('Todos');
   const [filterSituacao, setFilterSituacao] = useState('Todas');
   const [filterArticulador, setFilterArticulador] = useState('Todos');
   
-  // Filtros Territoriais
+  // Filtros Condicionais Territoriais
   const [filterDistrito, setFilterDistrito] = useState('Todos');
   const [filterRegiao, setFilterRegiao] = useState('Todas');
   const [filterMunicipioBairro, setFilterMunicipioBairro] = useState('Todas');
 
-  const [mapScope, setMapScope] = useState('SC');
-  const [localSyncUrl, setLocalSyncUrl] = useState(() => localStorage.getItem('tabulum_liderancas_sync') || GOOGLE_SHEETS_WEBAPP_URL);
+  const [isSettingsUnlocked, setIsSettingsUnlocked] = useState(false);
+  const [settingsPasswordInput, setSettingsPasswordInput] = useState('');
 
-  // Modais
-  const [showLoginModal, setShowLoginModal] = useState(false);
-  const [loginInput, setLoginInput] = useState('');
-  const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
+  const [localSyncUrl, setLocalSyncUrl] = useState(() => localStorage.getItem('tabulum_sync_url') || GOOGLE_SHEETS_WEBAPP_URL);
+  const [isLoading, setIsLoading] = useState(false);
 
-  // Listas Únicas
+  useEffect(() => {
+    if (localSyncUrl) syncWithCloud();
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.style.setProperty('--border-color', isDarkMode ? '#F4F4F0' : '#1A1A1A');
+  }, [isDarkMode]);
+
+  // Reseta os sub-filtros territoriais sempre que a Base mudar
+  useEffect(() => {
+    setFilterDistrito('Todos');
+    setFilterRegiao('Todas');
+    setFilterMunicipioBairro('Todas');
+    
+    // Auto-Ajusta o Mapa
+    if (filterBase === 'Base Florianópolis') setMapScope('FLN');
+    else if (filterBase === 'Base Santa Catarina') setMapScope('SC');
+  }, [filterBase]);
+
+  const t = {
+    bgApp: isDarkMode ? 'bg-[#121212]' : 'bg-[#F4F4F0]',
+    text: isDarkMode ? 'text-[#F4F4F0]' : 'text-[#1A1A1A]',
+    textMuted: isDarkMode ? 'text-gray-400' : 'text-gray-600',
+    border: isDarkMode ? 'border-[#F4F4F0]' : 'border-[#1A1A1A]',
+    cardBg: isDarkMode ? 'bg-[#1E1E1E]' : 'bg-white',
+    inputBg: isDarkMode ? 'bg-[#2A2A2A]' : 'bg-white',
+    inputBgAlt: isDarkMode ? 'bg-[#1E1E1E]' : 'bg-[#EAEAEA]',
+  };
+
+  const baseCard = `border-[3px] ${t.border} rounded-xl shadow-mondrian transition-all`;
+  const mondrianCard = `${baseCard} ${t.cardBg}`;
+  const mondrianButton = `font-bold border-[3px] ${t.border} rounded-xl shadow-mondrian-btn transition-all flex items-center justify-center gap-2 px-4 md:px-6 py-3 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed text-sm md:text-base`;
+
   const bases = ['Todas', 'Base Florianópolis', 'Base Santa Catarina'];
   const temasExtraidos = ['Todos', ...new Set(contacts.map(c => c.temas).filter(Boolean))].sort();
   const situacoesExtraidas = ['Todas', ...new Set(contacts.map(c => c.situacao).filter(Boolean))].sort();
   const articuladoresExtraidos = ['Todos', ...new Set(contacts.map(c => c.articulador).filter(Boolean))].sort();
+  
+  // Condicionais baseados nos contatos totais da base específica
   const distritosExtraidos = ['Todos', ...new Set(contacts.filter(c => c.base === 'Base Florianópolis').map(c => c.distrito).filter(Boolean))].sort();
   const bairrosExtraidos = ['Todas', ...new Set(contacts.filter(c => c.base === 'Base Florianópolis').map(c => c.municipio_bairro).filter(Boolean))].sort();
   const regioesExtraidas = ['Todas', ...new Set(contacts.filter(c => c.base === 'Base Santa Catarina').map(c => c.regiao).filter(Boolean))].sort();
   const municipiosExtraidos = ['Todas', ...new Set(contacts.filter(c => c.base === 'Base Santa Catarina').map(c => c.municipio_bairro).filter(Boolean))].sort();
 
-  useEffect(() => {
-    document.title = "TABULUM - Lideranças";
-    const storedAuth = sessionStorage.getItem('tabulum_liderancas_auth');
-    if (storedAuth === 'true') setIsAdmin(true);
-
-    if (localSyncUrl) syncWithCloud();
-  }, []);
-
-  useEffect(() => {
-    setFilterDistrito('Todos');
-    setFilterRegiao('Todas');
-    setFilterMunicipioBairro('Todas');
-    if (filterBase === 'Base Florianópolis') setMapScope('FLN');
-    else if (filterBase === 'Base Santa Catarina') setMapScope('SC');
-  }, [filterBase]);
-
-  // --- FUNÇÕES DE DADOS ---
   const syncWithCloud = async () => {
     if (!localSyncUrl) return;
-    setLoading(true);
+    setIsLoading(true);
     try {
       const res = await fetch(localSyncUrl);
       const data = await res.json();
-      if (Array.isArray(data) && data.length > 0) setContacts(data);
+      if (Array.isArray(data)) {
+        setContacts(data);
+      }
     } catch (e) {
       console.error("Erro ao sincronizar:", e);
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
   const saveToCloud = async (action, dataPayload) => {
     if (!localSyncUrl) return;
+    setIsLoading(true);
     try {
       await fetch(localSyncUrl, {
         method: 'POST',
@@ -137,15 +194,15 @@ export default function App() {
       await syncWithCloud();
     } catch (e) {
       console.error("Erro ao salvar na nuvem:", e);
-      alert("Ocorreu um erro ao comunicar com a planilha.");
+      setDialog({ type: 'alert', message: "Ocorreu um erro ao comunicar com a planilha. Verifique a URL." });
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleSaveContact = async () => {
-    if (!editingContact) return;
-    setLoading(true);
-    const isNew = !editingContact.id;
-    const contactToSave = { ...editingContact };
+    const isNew = !formData.id;
+    const contactToSave = { ...formData };
     
     if (isNew) {
       contactToSave.id = "temp_" + Date.now(); 
@@ -154,277 +211,131 @@ export default function App() {
       setContacts(prev => prev.map(c => String(c.id) === String(contactToSave.id) ? contactToSave : c));
     }
     
-    setSelectedContact(contactToSave);
-    setCurrentView('detail');
-    setEditingContact(null);
     await saveToCloud('update', contactToSave);
-    setLoading(false);
+    setSelectedContact(null);
+    setIsEditMode(false);
   };
 
   const handleDeleteContact = (id) => {
-    confirmAction("Apagar Liderança", "Tem certeza que deseja apagar permanentemente este contato da base?", async () => {
-      setLoading(true);
-      setContacts(prev => prev.filter(c => String(c.id) !== String(id)));
-      setCurrentView('list');
-      setEditingContact(null);
-      await saveToCloud('delete', { id });
-      setLoading(false);
-    });
-  };
-
-  const handleLogin = () => {
-    if (loginInput === 'admin') {
-      setIsAdmin(true);
-      sessionStorage.setItem('tabulum_liderancas_auth', 'true');
-      setShowLoginModal(false);
-      setLoginInput('');
-    } else {
-      alert("Senha incorreta.");
-    }
-  };
-
-  const confirmAction = (title, message, onConfirm) => {
-    setConfirmModal({
-      isOpen: true, title, message,
-      onConfirm: () => {
-        onConfirm();
-        setConfirmModal({ isOpen: false, title: '', message: '', onConfirm: null });
+    setDialog({
+      type: 'confirm',
+      message: 'Tem certeza que deseja apagar permanentemente esta liderança?',
+      onConfirm: async () => {
+        setDialog(null);
+        setContacts(prev => prev.filter(c => String(c.id) !== String(id)));
+        await saveToCloud('delete', { id });
+        setSelectedContact(null);
+        setIsEditMode(false);
       }
     });
   };
 
-  // --- FILTROS ---
-  const filteredContacts = useMemo(() => {
-    return contacts.filter(c => {
-      const matchesBase = filterBase === 'Todas' || c.base === filterBase;
-      const matchesArticulador = filterArticulador === 'Todos' || c.articulador === filterArticulador;
-      const matchesRegiao = filterRegiao === 'Todas' || c.regiao === filterRegiao;
-      const matchesDistrito = filterDistrito === 'Todos' || c.distrito === filterDistrito;
-      const matchesMunBairro = filterMunicipioBairro === 'Todas' || c.municipio_bairro === filterMunicipioBairro;
-      const matchesTemas = filterTemas === 'Todos' || c.temas === filterTemas;
-      const matchesSituacao = filterSituacao === 'Todas' || c.situacao === filterSituacao;
-      
-      const searchLower = searchTerm.toLowerCase();
-      const matchesSearch = !searchTerm || 
-        (c.lideranca && c.lideranca.toLowerCase().includes(searchLower)) ||
-        (c.municipio_bairro && c.municipio_bairro.toLowerCase().includes(searchLower)) ||
-        (c.area_de_atuacao && c.area_de_atuacao.toLowerCase().includes(searchLower));
-        
-      return matchesBase && matchesArticulador && matchesRegiao && matchesDistrito && 
-             matchesMunBairro && matchesTemas && matchesSituacao && matchesSearch;
+  const openNewContactModal = () => {
+    setFormData({
+      id: '', base: 'Base Florianópolis', lideranca: '', municipio_bairro: '',
+      regiao: '', distrito: '', situacao: '', area_de_atuacao: '', temas: '',
+      tema_institucional: '', articulador: filterArticulador !== 'Todos' ? filterArticulador : '', 
+      telefone: '', email: '', observacoes: ''
     });
-  }, [contacts, filterBase, filterArticulador, filterRegiao, filterDistrito, filterMunicipioBairro, filterTemas, filterSituacao, searchTerm]);
+    setIsEditMode(true);
+    setSelectedContact({ isNew: true });
+  };
 
-  // --- COMPONENTES COMPARTILHADOS NEO-BRUTALISTAS ---
-  const Navbar = () => (
-    <nav className="bg-white border-b-4 border-black sticky top-0 z-20">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16">
-          <div className="flex items-center cursor-pointer group" onClick={() => setCurrentView('list')}>
-            <div className="w-10 h-10 bg-amber-400 border-2 border-black flex items-center justify-center mr-3 shadow-[2px_2px_0_0_rgba(0,0,0,1)] transition-transform group-hover:scale-110">
-               <UserIcon className="h-6 w-6 text-black" />
-            </div>
-            <span className="font-black text-2xl tracking-tighter text-black hidden sm:block">TABULUM <span className="text-teal-700">Lideranças</span></span>
-          </div>
-          <div className="flex items-center space-x-3">
-            {isAdmin ? (
-              <>
-                <button onClick={() => {
-                  setEditingContact({
-                    id: '', base: 'Base Florianópolis', lideranca: '', municipio_bairro: '', regiao: '', distrito: '', situacao: '', area_de_atuacao: '', temas: '', tema_institucional: '', articulador: filterArticulador !== 'Todos' ? filterArticulador : '', telefone: '', email: '', observacoes: ''
-                  });
-                  setCurrentView('edit');
-                }} className="hidden sm:flex items-center bg-teal-600 border-2 border-black px-4 py-2 font-black text-white uppercase shadow-[2px_2px_0_0_rgba(0,0,0,1)] hover:bg-teal-700 transition-transform active:translate-y-1 active:shadow-none">
-                  <PlusIcon className="h-4 w-4 mr-2" /> Novo Contato
-                </button>
-                <button onClick={() => setCurrentView('settings')} className="bg-amber-400 border-2 border-black p-2 hover:bg-amber-500 shadow-[2px_2px_0_0_rgba(0,0,0,1)] transition-transform active:translate-y-1 active:shadow-none" title="Ajustes">
-                  <SettingsIcon className="h-5 w-5 text-black" />
-                </button>
-                <button onClick={() => { setIsAdmin(false); sessionStorage.removeItem('tabulum_liderancas_auth'); }} className="bg-rose-700 border-2 border-black p-2 hover:bg-rose-800 shadow-[2px_2px_0_0_rgba(0,0,0,1)] transition-transform active:translate-y-1 active:shadow-none" title="Sair">
-                  <LogOutIcon className="h-5 w-5 text-white" />
-                </button>
-              </>
-            ) : (
-              <button onClick={() => setShowLoginModal(true)} className="flex items-center bg-amber-400 border-2 border-black px-4 py-2 font-black text-black uppercase shadow-[2px_2px_0_0_rgba(0,0,0,1)] hover:bg-amber-500 transition-transform active:translate-y-1 active:shadow-none">
-                <LogInIcon className="h-4 w-4 mr-2" /> Acesso
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-    </nav>
-  );
+  const openEditModal = (contact) => {
+    setFormData({ ...contact });
+    setIsEditMode(true);
+  };
 
-  const HeaderSwitcher = ({ title }) => (
-    <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 space-y-4 md:space-y-0">
-      <div className="flex items-center space-x-4">
-        <h1 className="text-3xl font-black text-black uppercase tracking-tight">{title}</h1>
-        <div className="flex border-2 border-black bg-white shadow-[4px_4px_0_0_rgba(0,0,0,1)]">
-          <button 
-            onClick={() => setCurrentView('list')}
-            className={`p-2 flex items-center font-bold uppercase text-xs border-r-2 border-black transition-colors ${currentView === 'list' ? 'bg-black text-white' : 'hover:bg-gray-100'}`}
-          >
-            <TableIcon className="h-4 w-4 sm:mr-2" /> <span className="hidden sm:inline">Diretório</span>
-          </button>
-          <button 
-            onClick={() => setCurrentView('dashboard')}
-            className={`p-2 flex items-center font-bold uppercase text-xs transition-colors ${currentView === 'dashboard' ? 'bg-amber-400 text-black' : 'hover:bg-gray-100'}`}
-          >
-            <LayoutDashboardIcon className="h-4 w-4 sm:mr-2" /> <span className="hidden sm:inline">Dashboard</span>
-          </button>
-        </div>
-      </div>
-      {isAdmin && currentView === 'list' && (
-        <button onClick={() => syncWithCloud()} disabled={loading}
-          className="flex items-center px-4 py-2 bg-teal-600 text-white font-bold uppercase border-2 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] hover:bg-teal-700 transition-transform active:translate-y-1 active:shadow-none">
-          <RefreshCwIcon className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} /> <span className="hidden sm:inline">Sincronizar</span>
-        </button>
-      )}
-    </div>
-  );
+  const handleFormChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
 
-  const FilterBar = () => (
-    <div className="bg-white p-4 border-4 border-black mb-8 flex flex-wrap gap-4 items-center shadow-[6px_6px_0_0_rgba(0,0,0,1)]">
-      <div className="flex-1 min-w-[200px] relative">
-        <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-500" />
-        <input 
-          type="text" 
-          placeholder="Buscar liderança, local..." 
-          className="w-full pl-10 pr-4 py-2 bg-gray-50 border-2 border-black rounded-none focus:outline-none focus:border-rose-700 font-medium"
-          value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
-        />
-      </div>
+  const handleSettingsLogin = (e) => {
+    e.preventDefault();
+    if (settingsPasswordInput === 'admin') {
+      setIsSettingsUnlocked(true);
+      setSettingsPasswordInput('');
+    } else {
+      setDialog({ type: 'alert', message: 'Senha incorreta. Acesso negado.' });
+      setSettingsPasswordInput('');
+    }
+  };
+
+  const activeContacts = useMemo(() => {
+    return contacts.filter(contact => {
+      const matchesBase = filterBase === 'Todas' || contact.base === filterBase;
+      const matchesArticulador = filterArticulador === 'Todos' || contact.articulador === filterArticulador;
+      const matchesRegiao = filterRegiao === 'Todas' || contact.regiao === filterRegiao;
+      const matchesDistrito = filterDistrito === 'Todos' || contact.distrito === filterDistrito;
+      const matchesMunBairro = filterMunicipioBairro === 'Todas' || contact.municipio_bairro === filterMunicipioBairro;
       
-      <select className="px-3 py-2 bg-gray-50 border-2 border-black rounded-none focus:outline-none focus:border-teal-600 font-bold uppercase text-xs cursor-pointer max-w-[150px] truncate"
-        value={filterBase} onChange={(e) => setFilterBase(e.target.value)}>
-        {bases.map(b => <option key={b} value={b}>{b}</option>)}
+      return matchesBase && matchesArticulador && matchesRegiao && matchesDistrito && matchesMunBairro;
+    });
+  }, [contacts, filterBase, filterArticulador, filterRegiao, filterDistrito, filterMunicipioBairro]);
+
+  const dashboardContacts = activeContacts;
+
+  const filteredContacts = useMemo(() => {
+    return activeContacts.filter(contact => {
+      const nomeMatch = contact.lideranca?.toLowerCase().includes(searchTerm.toLowerCase());
+      const localMatch = contact.municipio_bairro?.toLowerCase().includes(searchTerm.toLowerCase());
+      const areaMatch = contact.area_de_atuacao?.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesSearch = nomeMatch || localMatch || areaMatch;
+      
+      const matchesTemas = filterTemas === 'Todos' || contact.temas === filterTemas;
+      const matchesSituacao = filterSituacao === 'Todas' || contact.situacao === filterSituacao;
+      
+      return matchesSearch && matchesTemas && matchesSituacao;
+    });
+  }, [activeContacts, searchTerm, filterTemas, filterSituacao]);
+
+  const stats = useMemo(() => {
+    const floripaCount = dashboardContacts.filter(c => c.base === 'Base Florianópolis').length;
+    const scCount = dashboardContacts.filter(c => c.base === 'Base Santa Catarina').length;
+    
+    // Temas
+    const temaCounts = dashboardContacts.reduce((acc, curr) => {
+      if(curr.temas) acc[curr.temas] = (acc[curr.temas] || 0) + 1;
+      return acc;
+    }, {});
+    const topTemas = Object.entries(temaCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+
+    // Situação
+    const situacaoCounts = dashboardContacts.reduce((acc, curr) => {
+      if(curr.situacao) acc[curr.situacao] = (acc[curr.situacao] || 0) + 1;
+      return acc;
+    }, {});
+    const topSituacoes = Object.entries(situacaoCounts).sort((a, b) => a[0].localeCompare(b[0]));
+
+    return { total: dashboardContacts.length, floripaCount, scCount, topTemas, topSituacoes };
+  }, [dashboardContacts]);
+
+  const SelectFilter = ({ label, value, onChange, options, isDark = false }) => (
+    <div className="w-full sm:flex-1 min-w-[140px] flex flex-col gap-1.5">
+      <label className={`font-bold text-xs md:text-sm uppercase tracking-wide ${isDark ? 'text-[#1A1A1A]' : t.textMuted}`}>{label}</label>
+      <select 
+        value={value} 
+        onChange={onChange} 
+        className={`w-full px-3 py-2.5 rounded-lg border-[3px] ${t.border} font-medium ${t.inputBg} ${t.text} truncate focus:outline-none focus:ring-2 focus:ring-[#B32033] shadow-sm`}
+      >
+        {options.map(o => <option key={o} value={o}>{o}</option>)}
       </select>
-
-      {filterBase === 'Base Florianópolis' && (
-        <>
-          <select className="px-3 py-2 bg-gray-50 border-2 border-black rounded-none focus:outline-none focus:border-teal-600 font-bold uppercase text-xs cursor-pointer max-w-[120px] truncate" value={filterDistrito} onChange={(e) => setFilterDistrito(e.target.value)}>
-            <option value="Todos">Distrito</option>{distritosExtraidos.filter(d => d!=='Todos').map(d => <option key={d} value={d}>{d}</option>)}
-          </select>
-          <select className="px-3 py-2 bg-gray-50 border-2 border-black rounded-none focus:outline-none focus:border-teal-600 font-bold uppercase text-xs cursor-pointer max-w-[120px] truncate" value={filterMunicipioBairro} onChange={(e) => setFilterMunicipioBairro(e.target.value)}>
-            <option value="Todas">Bairro</option>{bairrosExtraidos.filter(b => b!=='Todas').map(b => <option key={b} value={b}>{b}</option>)}
-          </select>
-        </>
-      )}
-
-      {filterBase === 'Base Santa Catarina' && (
-        <>
-          <select className="px-3 py-2 bg-gray-50 border-2 border-black rounded-none focus:outline-none focus:border-teal-600 font-bold uppercase text-xs cursor-pointer max-w-[120px] truncate" value={filterRegiao} onChange={(e) => setFilterRegiao(e.target.value)}>
-            <option value="Todas">Região</option>{regioesExtraidas.filter(r => r!=='Todas').map(r => <option key={r} value={r}>{r}</option>)}
-          </select>
-          <select className="px-3 py-2 bg-gray-50 border-2 border-black rounded-none focus:outline-none focus:border-teal-600 font-bold uppercase text-xs cursor-pointer max-w-[120px] truncate" value={filterMunicipioBairro} onChange={(e) => setFilterMunicipioBairro(e.target.value)}>
-            <option value="Todas">Município</option>{municipiosExtraidos.filter(m => m!=='Todas').map(m => <option key={m} value={m}>{m}</option>)}
-          </select>
-        </>
-      )}
-
-      <select className="px-3 py-2 bg-gray-50 border-2 border-black rounded-none focus:outline-none focus:border-amber-500 font-bold uppercase text-xs cursor-pointer max-w-[120px] truncate"
-        value={filterTemas} onChange={(e) => setFilterTemas(e.target.value)}>
-        <option value="Todos">Tema</option>
-        {temasExtraidos.filter(t => t!=='Todos').map(t => <option key={t} value={t}>{t}</option>)}
-      </select>
-
-      <select className="px-3 py-2 bg-gray-50 border-2 border-black rounded-none focus:outline-none focus:border-amber-500 font-bold uppercase text-xs cursor-pointer max-w-[120px] truncate"
-        value={filterSituacao} onChange={(e) => setFilterSituacao(e.target.value)}>
-        <option value="Todas">Situação</option>
-        {situacoesExtraidas.filter(s => s!=='Todas').map(s => <option key={s} value={s}>{s}</option>)}
-      </select>
-
-      <select className="px-3 py-2 bg-gray-50 border-2 border-black rounded-none focus:outline-none focus:border-rose-700 font-bold uppercase text-xs cursor-pointer max-w-[120px] truncate"
-        value={filterArticulador} onChange={(e) => setFilterArticulador(e.target.value)}>
-        <option value="Todos">Articulador</option>
-        {articuladoresExtraidos.filter(a => a!=='Todos').map(a => <option key={a} value={a}>{a}</option>)}
-      </select>
-
-      <button onClick={() => { setSearchTerm(''); setFilterBase('Todas'); setFilterTemas('Todos'); setFilterSituacao('Todas'); setFilterArticulador('Todos'); }}
-        className="bg-rose-700 p-2 text-white border-2 border-black hover:bg-rose-800 transition-colors" title="Limpar filtros">
-        <XIcon className="h-5 w-5" />
-      </button>
     </div>
   );
 
   const SituacaoBadge = ({ situacao }) => {
-    if (!situacao) return <span className="text-gray-400 italic text-xs">Indefinida</span>;
-    let cor = "bg-gray-200 text-black";
-    if (situacao.includes("4 -")) cor = "bg-teal-600 text-white";
-    else if (situacao.includes("3 -")) cor = "bg-amber-400 text-black";
-    else if (situacao.includes("1 -") || situacao.includes("2 -")) cor = "bg-rose-700 text-white";
-    return <span className={`inline-block border-2 border-black px-2 py-0.5 text-[10px] font-black uppercase ${cor}`}>{situacao}</span>;
+    if (!situacao) return null;
+    let cor = isDarkMode ? "bg-gray-700 text-white" : "bg-gray-200 text-[#1A1A1A]";
+    if (situacao.includes("4 -")) cor = "bg-[#007577] text-white";
+    else if (situacao.includes("3 -")) cor = "bg-[#DCAE1D] text-[#1A1A1A]";
+    else if (situacao.includes("1 -") || situacao.includes("2 -")) cor = "bg-[#B32033] text-white";
+    return <span className={`px-2 py-1 text-[10px] md:text-xs font-bold rounded-md border-2 ${t.border} ${cor} truncate max-w-full block`}>{situacao}</span>;
   };
 
-  // --- VIEWS ---
-  const ListView = () => (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-in fade-in">
-      <HeaderSwitcher title="Diretório de Lideranças" />
-      <FilterBar />
-
-      <div className="bg-white border-4 border-black overflow-x-auto shadow-[8px_8px_0_0_rgba(0,0,0,1)]">
-        <table className="min-w-full border-collapse">
-          <thead className="bg-amber-400 border-b-4 border-black">
-            <tr>
-              <th className="w-2 px-0 py-0 border-r-2 border-black"></th>
-              <th className="px-4 py-3 text-left text-xs font-black text-black uppercase border-r-2 border-black">Liderança</th>
-              <th className="px-4 py-3 text-left text-xs font-black text-black uppercase border-r-2 border-black">Localização</th>
-              <th className="px-4 py-3 text-left text-xs font-black text-black uppercase border-r-2 border-black">Área / Tema</th>
-              <th className="px-4 py-3 text-left text-xs font-black text-black uppercase border-r-2 border-black">Situação</th>
-              <th className="px-4 py-3 text-left text-xs font-black text-black uppercase">Articulador</th>
-            </tr>
-          </thead>
-          <tbody className="bg-white">
-            {filteredContacts.map((c) => (
-              <tr key={c.id} onClick={() => { setSelectedContact(c); setCurrentView('detail'); }}
-                className="hover:bg-amber-50 cursor-pointer border-b-2 border-black transition-colors group">
-                <td className={`w-2 px-0 py-0 ${c.base.includes('Florianópolis') ? 'bg-teal-600' : 'bg-amber-400'} border-r-2 border-black`}></td>
-                <td className="px-4 py-3 text-sm font-bold text-black border-r-2 border-gray-200">
-                  {c.lideranca}
-                </td>
-                <td className="px-4 py-3 text-xs font-medium border-r-2 border-gray-200">
-                  <div className="flex items-center text-teal-800">
-                    <MapPinIcon className="h-3 w-3 mr-1" /> {c.municipio_bairro} {c.distrito ? `- ${c.distrito}` : ''}
-                  </div>
-                </td>
-                <td className="px-4 py-3 text-xs border-r-2 border-gray-200 max-w-[200px] truncate">
-                  <span className="font-bold block truncate">{c.area_de_atuacao || '-'}</span>
-                  <span className="text-[10px] uppercase text-gray-500 font-bold flex items-center mt-1"><TagIcon className="h-3 w-3 mr-1" /> {c.temas || 'Sem Tema'}</span>
-                </td>
-                <td className="px-4 py-3 whitespace-nowrap border-r-2 border-gray-200">
-                  <SituacaoBadge situacao={c.situacao} />
-                </td>
-                <td className="px-4 py-3 whitespace-nowrap">
-                  <span className="text-sm font-bold text-rose-700 flex items-center">
-                    <UserIcon className="h-3 w-3 mr-1" /> {c.articulador || '-'}
-                  </span>
-                </td>
-              </tr>
-            ))}
-            {filteredContacts.length === 0 && (
-              <tr><td colSpan="6" className="px-6 py-12 text-center font-bold text-gray-500 uppercase">Nenhum contato encontrado.</td></tr>
-            )}
-          </tbody>
-        </table>
-        <div className="bg-gray-100 px-6 py-3 font-bold text-sm text-black flex justify-between">
-          <span>{filteredContacts.length} Registros Filtrados</span>
-        </div>
-      </div>
-    </div>
-  );
-
-  const DashboardView = () => {
-    const floripaCount = filteredContacts.filter(c => c.base === 'Base Florianópolis').length;
-    const scCount = filteredContacts.filter(c => c.base === 'Base Santa Catarina').length;
-    
-    const temaCounts = filteredContacts.reduce((acc, curr) => { if(curr.temas) acc[curr.temas] = (acc[curr.temas] || 0) + 1; return acc; }, {});
-    const topTemas = Object.entries(temaCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
-
-    const situacaoCounts = filteredContacts.reduce((acc, curr) => { if(curr.situacao) acc[curr.situacao] = (acc[curr.situacao] || 0) + 1; return acc; }, {});
-    const topSituacoes = Object.entries(situacaoCounts).sort((a, b) => a[0].localeCompare(b[0]));
-
+  const renderHeatMap = () => {
     const heatPoints = {};
-    filteredContacts.forEach(c => {
+    dashboardContacts.forEach(c => {
       if (mapScope === 'FLN' && c.base !== 'Base Florianópolis') return;
       if (mapScope === 'SC' && c.base !== 'Base Santa Catarina') return; 
       const locName = c.municipio_bairro;
@@ -434,283 +345,561 @@ export default function App() {
         heatPoints[locName].count += 1;
       }
     });
+
     const maxCount = Math.max(1, ...Object.values(heatPoints).map(p => p.count));
 
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-in fade-in">
-        <HeaderSwitcher title="Dashboard Estatístico" />
-        <FilterBar />
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-1 space-y-8">
-            <div className="bg-amber-400 border-4 border-black p-6 shadow-[8px_8px_0_0_rgba(0,0,0,1)]">
-              <p className="text-black font-black uppercase text-sm tracking-widest border-b-4 border-black pb-2 mb-4">Total Filtrado</p>
-              <h2 className="text-5xl font-black text-black leading-none">{filteredContacts.length}</h2>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-               <div className="bg-teal-600 text-white border-4 border-black p-4 shadow-[4px_4px_0_0_rgba(0,0,0,1)]">
-                 <p className="font-black uppercase text-[10px] tracking-widest mb-2 flex items-center"><MapPinIcon className="h-3 w-3 mr-1"/> Floripa</p>
-                 <h2 className="text-3xl font-black">{floripaCount}</h2>
-               </div>
-               <div className="bg-white text-black border-4 border-black p-4 shadow-[4px_4px_0_0_rgba(0,0,0,1)]">
-                 <p className="font-black uppercase text-[10px] tracking-widest mb-2 flex items-center"><MapPinIcon className="h-3 w-3 mr-1"/> S. Catarina</p>
-                 <h2 className="text-3xl font-black">{scCount}</h2>
-               </div>
-            </div>
-
-            <div className="bg-white border-4 border-black p-6 shadow-[8px_8px_0_0_rgba(0,0,0,1)]">
-              <p className="text-black font-black uppercase text-sm tracking-widest border-b-4 border-black pb-2 mb-6">Status de Alinhamento</p>
-              <div className="space-y-4">
-                {topSituacoes.length > 0 ? topSituacoes.map(([nome, count]) => {
-                  const pct = Math.max((count / filteredContacts.length) * 100, 5);
-                  let colorClass = 'bg-gray-200';
-                  if (nome.includes('4 -')) colorClass = 'bg-teal-600';
-                  else if (nome.includes('3 -')) colorClass = 'bg-amber-400';
-                  else if (nome.includes('1 -') || nome.includes('2 -')) colorClass = 'bg-rose-700';
-                  return (
-                    <div key={nome}>
-                      <div className="flex justify-between text-[10px] font-bold uppercase mb-1">
-                        <span>{nome}</span><span>{count}</span>
-                      </div>
-                      <div className="h-4 w-full bg-gray-100 border-2 border-black">
-                        <div className={`h-full ${colorClass} border-r-2 border-black`} style={{ width: `${pct}%` }}></div>
-                      </div>
-                    </div>
-                  );
-                }) : <p className="text-sm font-bold text-gray-500 uppercase">Sem dados.</p>}
-              </div>
-            </div>
-            
-            <div className="bg-white border-4 border-black p-6 shadow-[8px_8px_0_0_rgba(0,0,0,1)]">
-              <p className="text-black font-black uppercase text-sm tracking-widest border-b-4 border-black pb-2 mb-6">Top Temas</p>
-              <div className="space-y-4">
-                {topTemas.length > 0 ? topTemas.map(([nome, count]) => {
-                  const max = Math.max(...topTemas.map(t => t[1]));
-                  const pct = Math.max((count / max) * 100, 5);
-                  return (
-                    <div key={nome}>
-                      <div className="flex justify-between text-[10px] font-bold uppercase mb-1">
-                        <span className="truncate pr-2">{nome}</span><span>{count}</span>
-                      </div>
-                      <div className="h-4 w-full bg-gray-100 border-2 border-black">
-                        <div className="h-full bg-black border-r-2 border-black" style={{ width: `${pct}%` }}></div>
-                      </div>
-                    </div>
-                  );
-                }) : <p className="text-sm font-bold text-gray-500 uppercase">Sem dados.</p>}
-              </div>
-            </div>
+      <div className={`${baseCard} bg-[#1A1A1A] p-4 md:p-6 flex flex-col lg:col-span-3 text-[#F4F4F0] overflow-hidden`}>
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+          <h3 className="text-xl md:text-2xl font-bold flex items-center gap-2 w-full md:w-auto">
+            <Icon name="map" size={28} className="text-[#DCAE1D] shrink-0" /> 
+            <span className="truncate">Densidade: {mapScope === 'SC' ? 'Santa Catarina' : 'Floripa'}</span>
+          </h3>
+          <div className="flex border-[3px] border-[#F4F4F0] rounded-lg overflow-hidden shrink-0 w-full md:w-auto">
+            <button onClick={() => setMapScope('SC')} className={`flex-1 px-4 py-2 font-bold transition-colors ${mapScope === 'SC' ? 'bg-[#DCAE1D] text-[#1A1A1A]' : 'bg-transparent text-[#F4F4F0] hover:bg-gray-800'}`}>SC</button>
+            <div className="w-[3px] bg-[#F4F4F0]"></div>
+            <button onClick={() => setMapScope('FLN')} className={`flex-1 px-4 py-2 font-bold transition-colors ${mapScope === 'FLN' ? 'bg-[#007577] text-white' : 'bg-transparent text-[#F4F4F0] hover:bg-gray-800'}`}>Floripa</button>
           </div>
-
-          <div className="lg:col-span-2 bg-white border-4 border-black shadow-[8px_8px_0_0_rgba(0,0,0,1)] flex flex-col relative overflow-hidden h-[600px] lg:h-auto">
-            <div className="bg-black border-b-4 border-black p-4 flex justify-between items-center z-10 flex-wrap gap-4">
-              <p className="text-white font-black uppercase tracking-widest flex items-center">
-                <MapPinIcon className="h-5 w-5 mr-2 text-amber-400" /> Densidade Territorial
-              </p>
-              <div className="flex border-2 border-white bg-black">
-                <button onClick={() => setMapScope('SC')} className={`px-4 py-1 font-bold text-xs uppercase border-r-2 border-white transition-colors ${mapScope === 'SC' ? 'bg-amber-400 text-black' : 'text-white hover:bg-gray-800'}`}>SC</button>
-                <button onClick={() => setMapScope('FLN')} className={`px-4 py-1 font-bold text-xs uppercase transition-colors ${mapScope === 'FLN' ? 'bg-teal-600 text-white' : 'text-white hover:bg-gray-800'}`}>Floripa</button>
+        </div>
+        <div className={`relative w-full ${mapScope === 'SC' ? 'aspect-video max-h-[500px]' : 'aspect-[3/4] max-h-[500px] max-w-[400px] mx-auto'} bg-[#2A2A2A] rounded-lg border-2 border-gray-700 overflow-hidden`}>
+          <svg className="absolute inset-0 w-full h-full opacity-30 pointer-events-none" preserveAspectRatio="none" viewBox="0 0 100 100">
+            {mapScope === 'SC' ? (
+              <polygon points="5,45 35,30 65,20 85,10 95,40 98,55 90,85 75,95 55,75 25,65 5,60" fill="#007577" stroke="#F4F4F0" strokeWidth="1" strokeLinejoin="round" />
+            ) : (
+              <>
+                <polygon points="5,35 35,35 40,55 25,65 5,65" fill="#DCAE1D" stroke="#F4F4F0" strokeWidth="1" strokeLinejoin="round" />
+                <polygon points="45,15 65,10 75,40 85,70 70,95 55,85 50,60 40,40" fill="#007577" stroke="#F4F4F0" strokeWidth="1" strokeLinejoin="round" />
+              </>
+            )}
+          </svg>
+          {Object.values(heatPoints).map((pt, i) => {
+            const intensity = pt.count / maxCount;
+            const size = 16 + (intensity * 40); 
+            const opacity = 0.5 + (intensity * 0.5);
+            const color = mapScope === 'FLN' ? '#DCAE1D' : '#B32033';
+            return (
+              <div key={i} className="absolute flex items-center justify-center transform -translate-x-1/2 -translate-y-1/2 group cursor-crosshair" style={{ top: `${pt.y}%`, left: `${pt.x}%`, width: size, height: size }}>
+                <div className="absolute inset-0 rounded-full animate-pulse" style={{ backgroundColor: color, opacity: opacity * 0.5 }}></div>
+                <div className="absolute inset-2 rounded-full border-2 border-white shadow-[0_0_10px_rgba(0,0,0,0.5)]" style={{ backgroundColor: color, opacity: opacity }}></div>
+                <div className="absolute top-full mt-2 w-max max-w-[150px] bg-[#F4F4F0] text-[#1A1A1A] text-xs font-bold px-2 py-1 rounded border-2 border-[#1A1A1A] opacity-0 group-hover:opacity-100 transition-opacity z-10 shadow-md">
+                  {pt.label}: {pt.count} contatos
+                </div>
               </div>
-            </div>
-            
-            <div className="flex-1 bg-[#e5e5e5] relative overflow-hidden flex items-center justify-center p-4">
-               <div className={`relative w-full ${mapScope === 'SC' ? 'aspect-video max-w-2xl' : 'aspect-[3/4] max-w-sm'}`}>
-                  <svg className="absolute inset-0 w-full h-full opacity-20 pointer-events-none" preserveAspectRatio="none" viewBox="0 0 100 100">
-                    {mapScope === 'SC' ? (
-                      <polygon points="5,45 35,30 65,20 85,10 95,40 98,55 90,85 75,95 55,75 25,65 5,60" fill="#000" />
-                    ) : (
-                      <>
-                        <polygon points="5,35 35,35 40,55 25,65 5,65" fill="#000" />
-                        <polygon points="45,15 65,10 75,40 85,70 70,95 55,85 50,60 40,40" fill="#000" />
-                      </>
-                    )}
-                  </svg>
-                  {Object.values(heatPoints).map((pt, i) => {
-                    const intensity = pt.count / maxCount;
-                    const size = 20 + (intensity * 40); 
-                    const color = mapScope === 'FLN' ? '#0d9488' : '#be123c'; // teal-600 ou rose-700
-                    return (
-                      <div key={i} className="absolute flex items-center justify-center transform -translate-x-1/2 -translate-y-1/2 group cursor-crosshair" style={{ top: `${pt.y}%`, left: `${pt.x}%`, width: size, height: size }}>
-                        <div className="absolute inset-0 rounded-full animate-pulse opacity-40" style={{ backgroundColor: color }}></div>
-                        <div className="absolute inset-2 rounded-full border-2 border-black shadow-[2px_2px_0_0_rgba(0,0,0,1)]" style={{ backgroundColor: color }}></div>
-                        <div className="absolute top-full mt-2 w-max max-w-[150px] bg-white text-black text-xs font-black px-2 py-1 border-2 border-black opacity-0 group-hover:opacity-100 transition-opacity z-10 shadow-[2px_2px_0_0_rgba(0,0,0,1)] uppercase">
-                          {pt.label}: {pt.count}
-                        </div>
-                      </div>
-                    );
-                  })}
-               </div>
-            </div>
-          </div>
+            );
+          })}
         </div>
       </div>
     );
   };
 
-  const DetailView = () => {
-    const isEditing = currentView === 'edit';
-    const data = isEditing ? editingContact : selectedContact;
-    if (!data) return null;
-
-    const handleInputChange = (field, value) => setEditingContact(prev => ({ ...prev, [field]: value }));
-
-    const InfoField = ({ label, field, icon: IconComponent, type = 'text', color = 'teal', options = null }) => {
-      const value = data[field];
-      const colorClass = color === 'teal' ? 'text-teal-700' : color === 'rose' ? 'text-rose-700' : 'text-amber-600';
+  const renderDashboard = () => (
+    <div className="space-y-6 animation-fade-in">
       
-      if (isEditing) {
-        return (
-          <div className="mb-4">
-            <label className={`block text-[10px] font-black uppercase mb-1 ${colorClass}`}>{label}</label>
-            {type === 'textarea' ? (
-              <textarea className="w-full p-2 bg-gray-50 border-2 border-black rounded-none focus:outline-none focus:border-rose-700 font-medium"
-                rows="3" value={value || ''} onChange={(e) => handleInputChange(field, e.target.value)} />
-            ) : options ? (
-              <select className="w-full p-2 bg-gray-50 border-2 border-black rounded-none focus:outline-none focus:border-rose-700 font-medium cursor-pointer"
-                value={value || ''} onChange={(e) => handleInputChange(field, e.target.value)}>
-                {options.map(o => <option key={o} value={o}>{o}</option>)}
-              </select>
+      <div className={`p-4 md:p-6 rounded-xl border-[3px] ${t.border} ${t.cardBg} flex flex-col gap-4 shadow-mondrian`}>
+        <h2 className={`text-xl md:text-2xl font-black ${t.text} flex items-center gap-2 shrink-0`}>
+          <Icon name="dashboard" /> Painel de Controle
+        </h2>
+        <div className="flex flex-col sm:flex-row flex-wrap gap-4 items-end">
+          <SelectFilter label="Base" value={filterBase} onChange={e => setFilterBase(e.target.value)} options={bases} />
+          
+          {filterBase === 'Base Florianópolis' && (
+            <>
+              <SelectFilter label="Distrito" value={filterDistrito} onChange={e => setFilterDistrito(e.target.value)} options={distritosExtraidos} />
+              <SelectFilter label="Bairro" value={filterMunicipioBairro} onChange={e => setFilterMunicipioBairro(e.target.value)} options={bairrosExtraidos} />
+            </>
+          )}
+
+          {filterBase === 'Base Santa Catarina' && (
+            <>
+              <SelectFilter label="Região" value={filterRegiao} onChange={e => setFilterRegiao(e.target.value)} options={regioesExtraidas} />
+              <SelectFilter label="Município" value={filterMunicipioBairro} onChange={e => setFilterMunicipioBairro(e.target.value)} options={municipiosExtraidos} />
+            </>
+          )}
+
+          <SelectFilter label="Articulador" value={filterArticulador} onChange={e => setFilterArticulador(e.target.value)} options={articuladoresExtraidos} />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className={`${mondrianCard} p-6 flex flex-col justify-between overflow-hidden relative sm:col-span-2 lg:col-span-1`}>
+          <div className={`absolute top-0 right-0 w-16 h-16 bg-[#B32033] border-l-[3px] border-b-[3px] ${t.border} rounded-bl-xl`}></div>
+          <h3 className={`text-xl font-bold mb-2 relative z-10 ${t.text}`}>Total Filtrado</h3>
+          <p className={`text-6xl font-black relative z-10 ${t.text}`}>{stats.total}</p>
+        </div>
+        <div className={`${baseCard} bg-[#007577] text-white p-6 flex flex-col justify-between`}>
+          <h3 className="text-xl font-bold mb-2 flex items-center gap-2"><Icon name="mappin" /> Florianópolis</h3>
+          <p className="text-5xl font-black">{stats.floripaCount}</p>
+        </div>
+        <div className={`${baseCard} bg-[#DCAE1D] text-[#1A1A1A] p-6 flex flex-col justify-between`}>
+          <h3 className="text-xl font-bold mb-2 flex items-center gap-2"><Icon name="mappin" /> Santa Catarina</h3>
+          <p className="text-5xl font-black">{stats.scCount}</p>
+        </div>
+        
+        {renderHeatMap()}
+        
+        <div className="col-span-1 sm:col-span-2 lg:col-span-3 grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className={`${mondrianCard} p-6 flex flex-col`}>
+            <h3 className={`text-xl md:text-2xl font-bold mb-6 border-b-[3px] ${t.border} pb-2 flex items-center gap-2 ${t.text}`}>
+              <Icon name="barchart" /> Principais Temas
+            </h3>
+            {stats.topTemas.length > 0 ? (
+              <div className="space-y-4">
+                {stats.topTemas.map(([nome, count], index) => {
+                  const max = Math.max(...stats.topTemas.map(t => t[1]));
+                  const percentage = (count / max) * 100;
+                  const colors = ['bg-[#B32033]', 'bg-[#007577]', 'bg-[#DCAE1D]', isDarkMode ? 'bg-gray-400' : 'bg-[#1A1A1A]'];
+                  return (
+                    <div key={nome}>
+                      <div className={`flex justify-between text-sm font-bold mb-1 ${t.text}`}>
+                        <span className="truncate pr-4">{nome}</span>
+                        <span className="shrink-0">{count} conts.</span>
+                      </div>
+                      <div className={`h-4 w-full ${t.inputBgAlt} rounded-full border-2 ${t.border} overflow-hidden`}>
+                        <div className={`h-full ${colors[index % colors.length]} transition-all duration-1000 border-r-2 ${t.border}`} style={{ width: `${percentage}%` }}></div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             ) : (
-              <input type="text" className="w-full p-2 bg-gray-50 border-2 border-black rounded-none focus:outline-none focus:border-rose-700 font-medium"
-                value={value || ''} onChange={(e) => handleInputChange(field, e.target.value)} />
+              <p className={`font-medium ${t.textMuted} mt-auto`}>Não há temas associados a este filtro.</p>
             )}
           </div>
-        );
-      }
+
+          <div className={`${mondrianCard} p-6 flex flex-col`}>
+            <h3 className={`text-xl md:text-2xl font-bold mb-6 border-b-[3px] ${t.border} pb-2 flex items-center gap-2 ${t.text}`}>
+              <Icon name="check" /> Status de Alinhamento
+            </h3>
+            {stats.topSituacoes.length > 0 ? (
+              <div className="space-y-4">
+                {stats.topSituacoes.map(([nome, count]) => {
+                  const max = Math.max(...stats.topSituacoes.map(t => t[1]));
+                  const percentage = (count / max) * 100;
+                  
+                  let colorClass = isDarkMode ? 'bg-gray-400' : 'bg-gray-700';
+                  if (nome.includes('4 -')) colorClass = 'bg-[#007577]';
+                  else if (nome.includes('3 -')) colorClass = 'bg-[#DCAE1D]';
+                  else if (nome.includes('1 -') || nome.includes('2 -')) colorClass = 'bg-[#B32033]';
+
+                  return (
+                    <div key={nome}>
+                      <div className={`flex justify-between text-sm font-bold mb-1 ${t.text}`}>
+                        <span className="truncate pr-4">{nome}</span>
+                        <span className="shrink-0">{count} conts.</span>
+                      </div>
+                      <div className={`h-4 w-full ${t.inputBgAlt} rounded-full border-2 ${t.border} overflow-hidden`}>
+                        <div className={`h-full ${colorClass} transition-all duration-1000 border-r-2 ${t.border}`} style={{ width: `${percentage}%` }}></div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className={`font-medium ${t.textMuted} mt-auto`}>Sem dados de situação para exibir.</p>
+            )}
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+
+  const renderDirectory = () => (
+    <div className="space-y-6 animation-fade-in">
+      <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4">
+        <h2 className={`text-xl md:text-2xl font-black flex items-center gap-2 ${t.text}`}><Icon name="directory"/> Diretório Base</h2>
+        
+        {/* Toggle Grid/List e Adicionar */}
+        <div className="flex gap-2 sm:gap-4 flex-col sm:flex-row w-full sm:w-auto">
+          <div className={`flex border-[3px] ${t.border} rounded-xl overflow-hidden shadow-mondrian-btn ${t.inputBgAlt} w-full sm:w-auto`}>
+            <button 
+              onClick={() => setDirectoryViewMode('grid')} 
+              className={`p-2 sm:px-4 sm:py-2 flex-1 sm:flex-none flex items-center justify-center transition-colors ${directoryViewMode === 'grid' ? 'bg-[#DCAE1D] text-[#1A1A1A]' : `bg-transparent hover:bg-gray-500/20 ${t.text}`}`}
+              title="Visualização em Grade"
+            >
+              <Icon name="grid" size={20} />
+            </button>
+            <div className={`w-[3px] ${t.border}`}></div>
+            <button 
+              onClick={() => setDirectoryViewMode('list')} 
+              className={`p-2 sm:px-4 sm:py-2 flex-1 sm:flex-none flex items-center justify-center transition-colors ${directoryViewMode === 'list' ? 'bg-[#007577] text-white' : `bg-transparent hover:bg-gray-500/20 ${t.text}`}`}
+              title="Visualização em Lista"
+            >
+              <Icon name="list" size={20} />
+            </button>
+          </div>
+
+          <button onClick={openNewContactModal} className={`${mondrianButton} bg-[#007577] text-white hover:-translate-y-1 w-full sm:w-auto`}>
+            <Icon name="plus" size={20} /> Adicionar
+          </button>
+        </div>
+      </div>
+
+      <div className={`${mondrianCard} p-4 md:p-6 bg-[#DCAE1D] flex flex-col gap-4`}>
+        <div className="flex flex-col md:flex-row gap-4 items-end flex-wrap">
+          <div className="w-full md:flex-1 min-w-[200px] flex flex-col gap-1.5">
+            <label className="font-bold text-[#1A1A1A] text-xs md:text-sm uppercase tracking-wide">Buscar</label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-500"><Icon name="search" size={20} /></div>
+              <input type="text" placeholder="Nome, área..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className={`w-full pl-10 pr-3 py-2.5 rounded-lg border-[3px] ${t.border} focus:outline-none focus:ring-2 focus:ring-[#B32033] font-medium ${t.inputBg} ${t.text} shadow-sm`} />
+            </div>
+          </div>
+          
+          <SelectFilter label="Base" value={filterBase} onChange={e => setFilterBase(e.target.value)} options={bases} isDark={true} />
+          
+          {filterBase === 'Base Florianópolis' && (
+            <>
+              <SelectFilter label="Distrito" value={filterDistrito} onChange={e => setFilterDistrito(e.target.value)} options={distritosExtraidos} isDark={true} />
+              <SelectFilter label="Bairro" value={filterMunicipioBairro} onChange={e => setFilterMunicipioBairro(e.target.value)} options={bairrosExtraidos} isDark={true} />
+            </>
+          )}
+
+          {filterBase === 'Base Santa Catarina' && (
+            <>
+              <SelectFilter label="Região" value={filterRegiao} onChange={e => setFilterRegiao(e.target.value)} options={regioesExtraidas} isDark={true} />
+              <SelectFilter label="Município" value={filterMunicipioBairro} onChange={e => setFilterMunicipioBairro(e.target.value)} options={municipiosExtraidos} isDark={true} />
+            </>
+          )}
+
+          <SelectFilter label="Tema" value={filterTemas} onChange={e => setFilterTemas(e.target.value)} options={temasExtraidos} isDark={true} />
+          <SelectFilter label="Situação" value={filterSituacao} onChange={e => setFilterSituacao(e.target.value)} options={situacoesExtraidas} isDark={true} />
+          <SelectFilter label="Articulador" value={filterArticulador} onChange={e => setFilterArticulador(e.target.value)} options={articuladoresExtraidos} isDark={true} />
+        </div>
+      </div>
+
+      {filteredContacts.length === 0 ? (
+        <div className={`col-span-full py-12 px-4 text-center border-[3px] border-dashed ${t.border} rounded-xl ${t.cardBg}`}>
+          <Icon name="alert" size={48} className="mx-auto mb-4 text-[#B32033]" />
+          <h3 className={`text-xl md:text-2xl font-bold ${t.text}`}>Nenhum contato encontrado</h3>
+        </div>
+      ) : (
+        <>
+          {/* MODO GRADE (CARDS) */}
+          {directoryViewMode === 'grid' && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredContacts.map(contact => (
+                <div key={contact.id} onClick={() => { setSelectedContact(contact); setIsEditMode(false); }} className={`${mondrianCard} hover:-translate-y-1 hover:shadow-mondrian-btn cursor-pointer flex flex-col h-full`}>
+                  <div className={`h-3 w-full border-b-[3px] ${t.border} ${contact.base.includes('Florianópolis') ? 'bg-[#007577]' : 'bg-[#DCAE1D]'}`}></div>
+                  <div className="p-4 md:p-5 flex-grow flex flex-col gap-3">
+                    <div>
+                      <h3 className={`text-lg md:text-xl font-bold leading-tight mb-1 line-clamp-2 ${t.text}`}>{contact.lideranca}</h3>
+                      <div className={`flex items-start text-xs md:text-sm font-semibold gap-1 mb-2 ${t.textMuted}`}>
+                        <span className="text-[#B32033] mt-0.5 shrink-0"><Icon name="mappin" size={14} /></span> 
+                        <span className="line-clamp-2">{contact.municipio_bairro} {contact.distrito ? `- ${contact.distrito}` : ''}</span>
+                      </div>
+                      <SituacaoBadge situacao={contact.situacao} />
+                    </div>
+                    <div className={`mt-auto pt-4 border-t-2 border-dashed ${isDarkMode ? 'border-gray-700' : 'border-gray-300'} flex flex-wrap gap-2 items-center justify-between`}>
+                      <span className={`text-[10px] md:text-xs font-bold truncate max-w-[70%] ${t.textMuted}`}><Icon name="tag" size={12} className="inline mr-1"/>{contact.temas || 'S/ Tema'}</span>
+                      <button className={`p-2 ${t.inputBgAlt} border-2 ${t.border} rounded-md hover:bg-[#B32033] hover:text-white transition-colors shrink-0 ${t.text}`}><Icon name="chevronright" size={16} /></button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* MODO LISTA (LINHAS) */}
+          {directoryViewMode === 'list' && (
+            <div className="flex flex-col gap-3">
+              {filteredContacts.map(contact => (
+                <div key={contact.id} onClick={() => { setSelectedContact(contact); setIsEditMode(false); }} className={`${mondrianCard} relative overflow-hidden hover:-translate-y-1 hover:shadow-mondrian-btn cursor-pointer p-4 md:p-0 flex flex-col md:flex-row md:items-center gap-3 md:gap-0`}>
+                  
+                  {/* Barra de Cor (Topo no Celular, Lateral no Desktop) */}
+                  <div className={`h-2 w-full md:w-3 md:h-full absolute left-0 top-0 md:bottom-0 ${contact.base.includes('Florianópolis') ? 'bg-[#007577]' : 'bg-[#DCAE1D]'}`}></div>
+
+                  <div className="md:pl-6 md:pr-4 md:py-4 flex-1 mt-2 md:mt-0">
+                    <h3 className={`text-base md:text-lg font-bold leading-tight mb-1 truncate ${t.text}`}>{contact.lideranca}</h3>
+                    <div className={`flex items-start text-[10px] md:text-xs font-semibold gap-1 ${t.textMuted}`}>
+                      <span className="text-[#B32033] mt-0.5 shrink-0"><Icon name="mappin" size={12} /></span> 
+                      <span className="truncate">{contact.municipio_bairro} {contact.distrito ? `- ${contact.distrito}` : ''}</span>
+                    </div>
+                  </div>
+
+                  <div className="md:px-4 md:py-4 flex-1 hidden sm:block border-t-2 md:border-t-0 md:border-l-2 border-dashed border-gray-300 dark:border-gray-700">
+                    <span className={`text-[10px] md:text-xs font-bold truncate block ${t.textMuted}`}>Tema</span>
+                    <span className={`text-xs md:text-sm font-bold truncate block ${t.text}`}><Icon name="tag" size={12} className="inline mr-1"/>{contact.temas || 'S/ Tema'}</span>
+                  </div>
+
+                  <div className="md:px-4 md:py-4 md:w-48 shrink-0 flex items-center">
+                    <SituacaoBadge situacao={contact.situacao} />
+                  </div>
+
+                  <div className="md:px-4 md:py-4 md:w-40 shrink-0 hidden md:block border-l-2 border-dashed border-gray-300 dark:border-gray-700">
+                     <span className={`text-[10px] md:text-xs font-bold truncate block ${t.textMuted}`}>Articulador</span>
+                     <span className={`text-xs font-bold truncate flex items-center gap-1 ${t.text}`}>
+                        <Icon name="usercheck" size={14} className="text-[#007577]" /> {contact.articulador || 'N/A'}
+                     </span>
+                  </div>
+
+                  <div className="md:px-4 md:py-4 shrink-0 hidden md:flex items-center justify-center">
+                     <button className={`p-2 ${t.inputBgAlt} border-2 ${t.border} rounded-md hover:bg-[#B32033] hover:text-white transition-colors ${t.text}`}><Icon name="chevronright" size={16} /></button>
+                  </div>
+
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+
+  const renderSettings = () => {
+    if (!isSettingsUnlocked) {
       return (
-        <div className="mb-4 bg-white p-3 border-2 border-black shadow-[2px_2px_0_0_rgba(0,0,0,1)] relative">
-          <label className={`block text-[10px] font-black uppercase tracking-wider mb-1 flex items-center ${colorClass}`}>
-            {IconComponent && <IconComponent className="h-3 w-3 mr-1" />} {label}
-          </label>
-          <div className="text-black font-bold text-sm">
-            {field === 'situacao' ? <SituacaoBadge situacao={value} /> : value || <span className="text-gray-400 italic font-normal">N/A</span>}
+        <div className="space-y-6 animation-fade-in w-full max-w-md mx-auto mt-6 md:mt-12 px-2">
+          <div className={`${mondrianCard} p-6 md:p-8 text-center`}>
+            <div className="w-16 h-16 mx-auto bg-[#B32033] rounded-full border-[3px] border-[#1A1A1A] flex items-center justify-center text-white mb-6">
+              <Icon name="lock" size={32} />
+            </div>
+            <h2 className={`text-xl md:text-2xl font-black mb-2 ${t.text}`}>Área Restrita</h2>
+            <p className={`mb-6 text-xs md:text-sm ${t.textMuted}`}>Insira a senha de administrador para acessar as configurações.</p>
+            
+            <form onSubmit={handleSettingsLogin} className="flex flex-col gap-4">
+              <input 
+                type="password" 
+                value={settingsPasswordInput}
+                onChange={(e) => setSettingsPasswordInput(e.target.value)}
+                placeholder="Senha" 
+                className={`w-full px-4 py-3 rounded-lg border-[3px] ${t.border} font-medium ${t.inputBg} ${t.text} text-center tracking-widest focus:outline-none focus:ring-2 focus:ring-[#B32033]`}
+              />
+              <button type="submit" className={`${mondrianButton} bg-[#1A1A1A] text-white w-full hover:bg-gray-800`}>
+                Desbloquear
+              </button>
+            </form>
           </div>
         </div>
       );
-    };
+    }
 
     return (
-      <div className="max-w-4xl mx-auto px-4 py-8 animate-in slide-in-from-right-4">
-        <button onClick={() => { setCurrentView('list'); setEditingContact(null); }}
-          className="bg-black text-white px-4 py-2 font-bold uppercase text-xs border-2 border-black hover:bg-gray-800 mb-6 flex items-center shadow-[4px_4px_0_0_rgba(0,0,0,1)]">
-          &larr; Voltar
-        </button>
+      <div className="space-y-6 animation-fade-in w-full max-w-4xl mx-auto">
+        <div className={`${mondrianCard} p-4 md:p-8 relative`}>
+          <button 
+            onClick={() => setIsSettingsUnlocked(false)} 
+            className="absolute top-4 right-4 md:top-8 md:right-8 text-[#B32033] hover:text-red-700 flex items-center gap-2 font-bold text-sm"
+          >
+            <Icon name="lock" size={16} /><span className="hidden sm:inline">Bloquear Sessão</span>
+          </button>
 
-        <div className="bg-white border-4 border-black shadow-[12px_12px_0_0_rgba(0,0,0,1)] relative overflow-hidden">
-          <div className={`absolute top-0 left-0 bottom-0 w-4 ${data.base === 'Base Florianópolis' ? 'bg-teal-600' : 'bg-amber-400'} border-r-4 border-black hidden md:block`}></div>
-          
-          <div className="bg-rose-700 border-b-4 border-black p-6 md:pl-10 flex flex-col md:flex-row justify-between items-start md:items-center space-y-4 md:space-y-0">
-            <div>
-              <p className="text-white font-bold uppercase text-[10px] mb-1 tracking-wider">Ficha de Liderança</p>
-              <h2 className="text-4xl font-black text-white tracking-tighter">
-                {isEditing && !data.id ? 'Novo Contato' : data.lideranca}
-              </h2>
-            </div>
-            {isAdmin && !isEditing && (
-              <button onClick={() => { setEditingContact({ ...selectedContact }); setCurrentView('edit'); }}
-                className="bg-amber-400 text-black border-2 border-black px-6 py-2 font-black uppercase shadow-[4px_4px_0_0_rgba(0,0,0,1)] hover:bg-amber-500 transition-transform active:translate-y-1 active:shadow-none flex items-center shrink-0">
-                <EditIcon className="h-5 w-5 mr-2" /> Editar Ficha
+          <h2 className={`text-2xl md:text-3xl font-black mb-6 md:mb-8 border-b-[3px] ${t.border} pb-4 pr-10 flex items-center gap-3 ${t.text}`}>
+            <span className="text-[#B32033]"><Icon name="settings" size={32} /></span> Ajustes
+          </h2>
+
+          <div className={`mb-8 md:mb-10 p-4 md:p-6 border-[3px] ${t.border} rounded-xl ${t.inputBgAlt}`}>
+            <h3 className={`text-lg md:text-xl font-bold mb-4 flex items-center gap-2 ${t.text}`}>
+               <Icon name="refresh" size={24} className="text-[#007577]" /> Sincronização Google Sheets
+            </h3>
+            <p className={`mb-4 text-xs md:text-sm font-medium ${t.textMuted}`}>
+              A URL primária está sendo puxada de forma segura através das Variáveis de Ambiente do servidor. Abaixo, você pode testar temporariamente outra URL.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3 mb-2">
+              <input 
+                type="text" 
+                value={localSyncUrl} 
+                onChange={(e) => {
+                  setLocalSyncUrl(e.target.value);
+                  localStorage.setItem('tabulum_sync_url', e.target.value);
+                }}
+                placeholder="https://script.google.com/macros/s/..." 
+                className={`w-full px-4 py-3 rounded-lg border-[3px] ${t.border} font-medium ${t.inputBg} ${t.text} focus:outline-none focus:ring-2 focus:ring-[#B32033]`}
+              />
+              <button onClick={syncWithCloud} disabled={isLoading || !localSyncUrl} className={`${mondrianButton} bg-[#007577] text-white w-full sm:w-auto shrink-0`}>
+                <Icon name="refresh" size={20} className={isLoading ? "animate-spin" : ""} /> {isLoading ? 'Aguarde' : 'Sincronizar'}
               </button>
-            )}
-            {isAdmin && isEditing && (
-              <div className="flex space-x-3 shrink-0">
-                <button onClick={() => { setCurrentView('list'); setEditingContact(null); }}
-                  className="bg-white text-black border-2 border-black px-4 py-2 font-black uppercase shadow-[4px_4px_0_0_rgba(0,0,0,1)] hover:bg-gray-100 transition-transform active:translate-y-1 active:shadow-none flex items-center">
-                  <XIcon className="h-5 w-5 mr-2" /> Cancela
-                </button>
-                <button onClick={handleSaveContact} disabled={loading}
-                  className="bg-teal-500 text-black border-2 border-black px-6 py-2 font-black uppercase shadow-[4px_4px_0_0_rgba(0,0,0,1)] hover:bg-teal-600 transition-transform active:translate-y-1 active:shadow-none flex items-center">
-                  {loading ? <RefreshCwIcon className="h-5 w-5 mr-2 animate-spin" /> : <SaveIcon className="h-5 w-5 mr-2" />} Salvar
-                </button>
-              </div>
+            </div>
+            {(!localSyncUrl) && (
+              <p className="text-xs text-[#B32033] font-bold">Variável de ambiente não detectada. Insira o link acima para testar.</p>
             )}
           </div>
 
-          <div className="p-6 md:pl-10 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6 mt-4">
-            {isEditing && (
-               <div className="col-span-1 md:col-span-2">
-                 <InfoField label="Nome da Liderança *" field="lideranca" color="rose" />
-               </div>
-            )}
-
-            <div className="space-y-3 bg-gray-50 border-2 border-black p-4 relative pt-6">
-              <div className="bg-black text-white font-black uppercase text-[10px] py-1 px-3 absolute -top-3 left-3 border-2 border-black shadow-[2px_2px_0_0_rgba(255,255,255,1)]">Território</div>
-              <InfoField label="Aba / Base" field="base" options={['Base Florianópolis', 'Base Santa Catarina']} color="rose" />
-              <InfoField label="Município / Bairro" field="municipio_bairro" icon={MapPinIcon} color="teal" />
-              <div className="grid grid-cols-2 gap-2">
-                <InfoField label="Região" field="regiao" />
-                <InfoField label="Distrito (Fpolis)" field="distrito" />
-              </div>
-            </div>
-
-            <div className="space-y-3 bg-gray-50 border-2 border-black p-4 relative pt-6">
-              <div className="bg-black text-white font-black uppercase text-[10px] py-1 px-3 absolute -top-3 left-3 border-2 border-black shadow-[2px_2px_0_0_rgba(255,255,255,1)]">Atuação & Alinhamento</div>
-              <InfoField label="Área de Atuação" field="area_de_atuacao" icon={BriefcaseIcon} color="amber" />
-              <div className="grid grid-cols-2 gap-2">
-                <InfoField label="Tema Principal" field="temas" icon={TagIcon} color="teal" />
-                <InfoField label="Tema Institucional" field="tema_institucional" />
-              </div>
-              <InfoField label="Situação / Status" field="situacao" color="rose" />
-            </div>
-
-            <div className="col-span-1 md:col-span-2 space-y-3 bg-teal-50 border-2 border-black p-4 relative pt-6">
-              <div className="bg-teal-600 text-white font-black uppercase text-[10px] py-1 px-3 absolute -top-3 left-3 border-2 border-black shadow-[2px_2px_0_0_rgba(255,255,255,1)]">Contato & Articulação</div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <InfoField label="Telefone" field="telefone" color="rose" />
-                <InfoField label="Email" field="email" />
-                <InfoField label="Articulador" field="articulador" icon={UserIcon} color="teal" />
-              </div>
-            </div>
-
-            <div className="col-span-1 md:col-span-2 space-y-3 bg-amber-50 border-2 border-black p-4 relative pt-6">
-              <div className="bg-amber-400 text-black font-black uppercase text-[10px] py-1 px-3 absolute -top-3 left-3 border-2 border-black shadow-[2px_2px_0_0_rgba(255,255,255,1)]">Observações Livres</div>
-              <InfoField label="Anotações" field="observacoes" type="textarea" />
-            </div>
-
-            {isEditing && data.id && (
-              <div className="col-span-1 md:col-span-2 pt-4 border-t-4 border-black border-dashed flex justify-end">
-                <button onClick={() => handleDeleteContact(data.id)} className="bg-rose-700 text-white border-2 border-black px-6 py-2 font-black uppercase shadow-[4px_4px_0_0_rgba(0,0,0,1)] hover:bg-rose-800 transition-transform active:translate-y-1 active:shadow-none flex items-center">
-                  <TrashIcon className="h-5 w-5 mr-2" /> Apagar Registro
-                </button>
-              </div>
-            )}
+          <div className={`p-4 md:p-6 border-[3px] ${t.border} rounded-xl ${t.inputBgAlt}`}>
+            <h3 className={`text-lg md:text-xl font-bold mb-4 ${t.text}`}>Aparência</h3>
+            <button onClick={() => setIsDarkMode(!isDarkMode)} className={`${mondrianButton} ${t.cardBg} ${t.text} w-full sm:w-auto`}>
+              {isDarkMode ? <span className="text-[#DCAE1D]"><Icon name="sun" size={20} /></span> : <span className="text-[#007577]"><Icon name="moon" size={20} /></span>}
+              Alternar para Tema {isDarkMode ? 'Claro' : 'Escuro'}
+            </button>
           </div>
         </div>
       </div>
     );
   };
 
-  const SettingsView = () => {
-    return (
-      <div className="max-w-2xl mx-auto px-4 py-8 animate-in fade-in">
-        <button onClick={() => setCurrentView('list')} className="bg-black text-white px-4 py-2 font-bold uppercase text-xs border-2 border-black hover:bg-gray-800 mb-6 flex items-center shadow-[4px_4px_0_0_rgba(0,0,0,1)]">
-          &larr; Voltar
-        </button>
+  const renderModal = () => {
+    if (!selectedContact) return null;
+    const inputClasses = `w-full px-3 py-2 mt-1 rounded border-2 ${t.border} font-medium ${t.inputBg} ${t.text} text-sm md:text-base focus:outline-none focus:ring-2 focus:ring-[#B32033]`;
 
-        <div className="bg-white border-4 border-black shadow-[12px_12px_0_0_rgba(0,0,0,1)]">
-          <div className="bg-teal-600 border-b-4 border-black p-6">
-             <h2 className="text-3xl font-black text-white uppercase tracking-tighter flex items-center"><SettingsIcon className="mr-3 h-8 w-8" /> Configurações</h2>
-          </div>
-          <div className="p-8 space-y-8">
-            <div className="bg-amber-400 border-4 border-black text-black p-4 flex items-start shadow-[4px_4px_0_0_rgba(0,0,0,1)]">
-              <AlertTriangleIcon className="h-6 w-6 mr-3 flex-shrink-0" />
-              <p className="text-sm font-bold">A URL da planilha Google agora pode ser gerenciada pelas Variáveis de Ambiente ou inserida manualmente abaixo para testes.</p>
-            </div>
+    return (
+      <div className="fixed inset-0 z-[50] flex items-center justify-center p-2 sm:p-4 bg-black/70 backdrop-blur-sm animation-fade-in">
+        <div className={`${mondrianCard} w-full max-w-3xl max-h-[95vh] overflow-y-auto relative flex flex-col md:flex-row`}>
+          <div className={`hidden md:block w-8 border-r-[3px] ${t.border} ${isEditMode ? 'bg-[#DCAE1D]' : 'bg-[#B32033]'} flex-shrink-0 transition-colors`}></div>
+          <div className="flex-grow p-4 md:p-8">
             
-            <div className="border-2 border-black p-6 bg-gray-50">
-              <h3 className="text-xl font-black uppercase text-teal-700 border-b-4 border-black pb-2 mb-4 flex items-center"><UploadCloudIcon className="h-6 w-6 mr-2" /> Sincronização Google Sheets</h3>
-              <div className="flex flex-col space-y-3">
-                <input type="text" value={localSyncUrl} onChange={(e) => {
-                    setLocalSyncUrl(e.target.value);
-                    localStorage.setItem('tabulum_liderancas_sync', e.target.value);
-                  }} placeholder="https://script.google.com/macros/s/..." 
-                  className="w-full p-3 bg-white border-2 border-black rounded-none focus:outline-none focus:border-teal-600 font-medium" />
-                <button onClick={syncWithCloud} disabled={loading || !localSyncUrl} className="bg-teal-600 text-white font-black uppercase px-6 py-3 border-2 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] hover:bg-teal-700 transition-transform active:translate-y-1 active:shadow-none whitespace-nowrap self-start">
-                  {loading ? 'Sincronizando...' : 'Testar Sincronização'}
+            <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-6">
+              <div className="w-full">
+                {isEditMode ? (
+                  <h2 className={`text-xl md:text-2xl font-black flex items-center gap-2 ${t.text}`}><Icon name="edit"/> {formData.id ? 'Editar Contato' : 'Novo Contato'}</h2>
+                ) : (
+                  <>
+                    <h2 className={`text-2xl md:text-3xl font-black mb-2 ${t.text} pr-12 sm:pr-0 leading-tight`}>{selectedContact.lideranca}</h2>
+                    <div className="flex gap-2 flex-wrap mt-2">
+                      <div className={`flex items-center gap-2 font-bold ${t.textMuted} ${t.inputBgAlt} w-fit px-3 py-1 rounded-md border-2 ${t.border} text-xs md:text-sm`}>
+                        <Icon name="tag" size={14} /> {selectedContact.base}
+                      </div>
+                      <SituacaoBadge situacao={selectedContact.situacao} />
+                    </div>
+                  </>
+                )}
+              </div>
+              <div className="flex gap-2 shrink-0 absolute top-4 right-4 sm:relative sm:top-auto sm:right-auto">
+                {!isEditMode && !selectedContact.isNew && (
+                  <button onClick={() => openEditModal(selectedContact)} className={`p-2 border-[3px] ${t.border} rounded-xl hover:bg-[#DCAE1D] transition-colors shadow-mondrian-btn ${t.text}`} title="Editar">
+                    <Icon name="edit" size={20} />
+                  </button>
+                )}
+                <button onClick={() => { setSelectedContact(null); setIsEditMode(false); }} className={`p-2 border-[3px] ${t.border} rounded-xl hover:bg-[#B32033] hover:text-white transition-colors shadow-mondrian-btn ${t.text}`} title="Fechar">
+                  <Icon name="x" size={20} />
                 </button>
               </div>
             </div>
+
+            {isEditMode ? (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
+                  <div>
+                    <label className={`text-[10px] md:text-xs font-bold uppercase ${t.textMuted}`}>Liderança (Nome) *</label>
+                    <input type="text" name="lideranca" value={formData.lideranca || ''} onChange={handleFormChange} className={inputClasses} required />
+                  </div>
+                  <div>
+                    <label className={`text-[10px] md:text-xs font-bold uppercase ${t.textMuted}`}>Aba / Base *</label>
+                    <select name="base" value={formData.base || 'Base Florianópolis'} onChange={handleFormChange} className={inputClasses}>
+                      <option value="Base Florianópolis">Base Florianópolis</option>
+                      <option value="Base Santa Catarina">Base Santa Catarina</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className={`text-[10px] md:text-xs font-bold uppercase ${t.textMuted}`}>Município / Bairro</label>
+                    <input type="text" name="municipio_bairro" value={formData.municipio_bairro || ''} onChange={handleFormChange} className={inputClasses} />
+                  </div>
+                  <div>
+                    <label className={`text-[10px] md:text-xs font-bold uppercase ${t.textMuted}`}>Região</label>
+                    <input type="text" name="regiao" value={formData.regiao || ''} onChange={handleFormChange} className={inputClasses} />
+                  </div>
+                  {formData.base === 'Base Florianópolis' && (
+                    <div>
+                      <label className={`text-[10px] md:text-xs font-bold uppercase ${t.textMuted}`}>Distrito (Só Floripa)</label>
+                      <input type="text" name="distrito" value={formData.distrito || ''} onChange={handleFormChange} className={inputClasses} />
+                    </div>
+                  )}
+                  <div>
+                    <label className={`text-[10px] md:text-xs font-bold uppercase ${t.textMuted}`}>Situação</label>
+                    <input type="text" name="situacao" value={formData.situacao || ''} onChange={handleFormChange} placeholder="Ex: 4 - Comprometido" className={inputClasses} />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className={`text-[10px] md:text-xs font-bold uppercase ${t.textMuted}`}>Área de Atuação Livre</label>
+                    <input type="text" name="area_de_atuacao" value={formData.area_de_atuacao || ''} onChange={handleFormChange} className={inputClasses} />
+                  </div>
+                  <div>
+                    <label className={`text-[10px] md:text-xs font-bold uppercase ${t.textMuted}`}>Temas</label>
+                    <input type="text" name="temas" value={formData.temas || ''} onChange={handleFormChange} className={inputClasses} />
+                  </div>
+                  <div>
+                    <label className={`text-[10px] md:text-xs font-bold uppercase ${t.textMuted}`}>Tema Institucional</label>
+                    <input type="text" name="tema_institucional" value={formData.tema_institucional || ''} onChange={handleFormChange} className={inputClasses} />
+                  </div>
+                  <div>
+                    <label className={`text-[10px] md:text-xs font-bold uppercase ${t.textMuted}`}>Articulador</label>
+                    <input type="text" name="articulador" value={formData.articulador || ''} onChange={handleFormChange} className={inputClasses} />
+                  </div>
+                  <div>
+                    <label className={`text-[10px] md:text-xs font-bold uppercase ${t.textMuted}`}>Telefone</label>
+                    <input type="text" name="telefone" value={formData.telefone || ''} onChange={handleFormChange} className={inputClasses} />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className={`text-[10px] md:text-xs font-bold uppercase ${t.textMuted}`}>E-mail</label>
+                    <input type="email" name="email" value={formData.email || ''} onChange={handleFormChange} className={inputClasses} />
+                  </div>
+                </div>
+                <div>
+                  <label className={`text-[10px] md:text-xs font-bold uppercase ${t.textMuted}`}>Observações</label>
+                  <textarea name="observacoes" value={formData.observacoes || ''} onChange={handleFormChange} rows="3" className={inputClasses}></textarea>
+                </div>
+
+                <div className={`mt-6 pt-6 border-t-[3px] ${t.border} flex flex-col sm:flex-row justify-between gap-3 sm:gap-4`}>
+                  {formData.id && (
+                    <button onClick={() => handleDeleteContact(formData.id)} disabled={isLoading} className={`${mondrianButton} bg-[#B32033] text-white w-full sm:w-auto order-last sm:order-first`}>
+                      <Icon name="trash" size={20} /> <span className="hidden sm:inline">Excluir</span>
+                    </button>
+                  )}
+                  <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 sm:ml-auto w-full sm:w-auto">
+                    <button onClick={() => { setIsEditMode(false); if(!formData.id) setSelectedContact(null); }} className={`${mondrianButton} ${t.inputBgAlt} ${t.text} w-full sm:w-auto`}>
+                      Cancelar
+                    </button>
+                    <button onClick={handleSaveContact} disabled={isLoading || !formData.lideranca} className={`${mondrianButton} bg-[#007577] text-white w-full sm:w-auto`}>
+                      <Icon name="save" size={20} className={isLoading ? "animate-spin" : ""} /> {isLoading ? 'Salvando...' : 'Salvar'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <>
+                {selectedContact.area_de_atuacao && (
+                  <div className={`mb-6 p-3 md:p-4 ${t.inputBgAlt} border-2 ${t.border} rounded-lg flex items-center gap-3`}>
+                    <span className="text-[#DCAE1D] shrink-0"><Icon name="briefcase" size={24} /></span>
+                    <div>
+                      <p className={`font-bold text-base md:text-lg leading-tight ${t.text}`}>{selectedContact.area_de_atuacao}</p>
+                      <p className={`text-xs md:text-sm font-semibold ${t.textMuted}`}>Área de Atuação</p>
+                    </div>
+                  </div>
+                )}
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6 mb-6 md:mb-8">
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-[10px] md:text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">Localização</label>
+                      <p className={`font-bold flex items-start gap-2 text-sm md:text-base ${t.text}`}>
+                        <span className="text-[#007577] mt-0.5 shrink-0"><Icon name="map" size={16}/></span> 
+                        <span>
+                          <span className="block">{selectedContact.municipio_bairro} {selectedContact.distrito ? `/ ${selectedContact.distrito}` : ''}</span>
+                          <span className={`text-xs md:text-sm ${t.textMuted}`}>{selectedContact.regiao}</span>
+                        </span>
+                      </p>
+                    </div>
+                    <div>
+                      <label className="text-[10px] md:text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">Telefone</label>
+                      <p className={`font-bold flex items-center gap-2 text-sm md:text-base break-all ${t.text}`}><span className="text-[#DCAE1D] shrink-0"><Icon name="phone" size={16}/></span> {selectedContact.telefone || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <label className="text-[10px] md:text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">E-mail</label>
+                      <p className={`font-bold flex items-center gap-2 text-sm md:text-base break-all ${t.text}`}><span className="text-[#B32033] shrink-0"><Icon name="mail" size={16}/></span> {selectedContact.email || 'N/A'}</p>
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-[10px] md:text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">Articulador(a)</label>
+                      <p className={`font-bold flex items-center gap-2 text-base md:text-lg ${t.text}`}>
+                        <span className="text-[#B32033] shrink-0"><Icon name="usercheck" size={18} /></span> {selectedContact.articulador || 'Não informado'}
+                      </p>
+                    </div>
+                    <div>
+                      <label className="text-[10px] md:text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">Tema Principal</label>
+                      <p className={`font-bold text-sm md:text-base ${t.text}`}>{selectedContact.temas || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <label className="text-[10px] md:text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">Tema Institucional</label>
+                      <p className={`font-bold text-sm md:text-base ${t.text}`}>{selectedContact.tema_institucional || 'N/A'}</p>
+                    </div>
+                  </div>
+                </div>
+                <div className={`border-t-[3px] ${t.border} pt-4 md:pt-6`}>
+                  <label className="text-[10px] md:text-xs font-bold text-gray-500 uppercase tracking-wider block mb-2">Observações</label>
+                  <div className={`${t.inputBgAlt} p-3 md:p-4 rounded-lg border-2 ${t.border} font-medium ${t.text} text-sm md:text-lg leading-relaxed whitespace-pre-wrap`}>
+                    {selectedContact.observacoes || 'Sem anotações.'}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -718,39 +907,76 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f4f4f0] font-sans text-gray-900 selection:bg-amber-400 selection:text-black pb-12">
-      <Navbar />
-      <main>
-        {currentView === 'list' && <ListView />}
-        {currentView === 'dashboard' && <DashboardView />}
-        {(currentView === 'detail' || currentView === 'edit') && <DetailView />}
-        {currentView === 'settings' && <SettingsView />}
-      </main>
+    <div className={`min-h-screen ${t.bgApp} p-3 sm:p-4 md:p-8 font-sans selection:bg-[#DCAE1D] selection:text-[#1A1A1A] transition-colors duration-300 overflow-x-hidden`}>
+      <style dangerouslySetInnerHTML={{__html: `
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .animation-fade-in { animation: fadeIn 0.3s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .shadow-mondrian { box-shadow: 5px 5px 0 0 var(--border-color); }
+        .shadow-mondrian-btn { box-shadow: 3px 3px 0 0 var(--border-color); }
+        .shadow-mondrian-btn:active:not(:disabled) { box-shadow: 0 0 0 0 transparent; transform: translate(3px, 3px); }
+      `}} />
 
-      {/* MODAL DE LOGIN */}
-      {showLoginModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-white border-4 border-black shadow-[16px_16px_0_0_rgba(0,0,0,1)] p-8 w-full max-w-sm m-4 relative">
-            <button onClick={() => setShowLoginModal(false)} className="absolute top-4 right-4 bg-white border-2 border-black p-1 hover:bg-rose-700 hover:text-white transition-colors">
-              <XIcon className="h-6 w-6" />
-            </button>
-            <h3 className="text-2xl font-black text-black uppercase mb-2 flex items-center tracking-tighter"><LogInIcon className="mr-3 h-8 w-8 text-teal-600" /> Acesso</h3>
-            <div className="w-16 h-2 bg-amber-400 border-2 border-black mb-6"></div>
-            <input type="password" value={loginInput} onChange={(e) => setLoginInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleLogin()} placeholder="Senha" className="w-full p-4 bg-gray-50 border-4 border-black rounded-none focus:outline-none focus:border-teal-600 font-medium mb-6" />
-            <button onClick={handleLogin} className="w-full bg-teal-600 text-white font-black uppercase py-4 border-4 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] hover:bg-teal-700 hover:-translate-y-1 transition-transform active:translate-y-1 active:shadow-none">Entrar</button>
+      <div className="max-w-6xl mx-auto">
+        <header className={`mb-6 md:mb-8 flex flex-col sm:flex-row sm:items-end justify-between border-b-[4px] ${t.border} pb-4 md:pb-6 gap-4 relative`}>
+          <div className="flex items-center gap-3 md:gap-4 relative z-10">
+            <div className={`w-12 h-12 md:w-16 md:h-16 bg-[#1A1A1A] border-[3px] ${t.border} rounded-xl shadow-mondrian flex items-center justify-center flex-shrink-0`}>
+              <Icon name="users" size={28} className="text-[#DCAE1D] md:w-8 md:h-8 w-6 h-6" />
+            </div>
+            <div>
+              <h1 className={`text-2xl md:text-4xl font-black uppercase tracking-tight ${t.text} leading-none`}>TABULUM</h1>
+              <p className="text-sm md:text-lg font-bold text-[#007577] mt-1">Mapa de Lideranças</p>
+            </div>
           </div>
-        </div>
-      )}
+          <div className="flex gap-2 relative z-10 self-start sm:self-auto ml-1 sm:ml-0 mt-2 sm:mt-0">
+            <span className={`h-3 w-3 md:h-4 md:w-4 rounded-sm border-2 ${t.border} bg-[#B32033]`}></span>
+            <span className={`h-3 w-3 md:h-4 md:w-4 rounded-sm border-2 ${t.border} bg-[#007577]`}></span>
+            <span className={`h-3 w-3 md:h-4 md:w-4 rounded-sm border-2 ${t.border} bg-[#DCAE1D]`}></span>
+          </div>
+        </header>
 
-      {/* MODAL DE CONFIRMAÇÃO */}
-      {confirmModal.isOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-white border-4 border-black shadow-[16px_16px_0_0_rgba(0,0,0,1)] p-8 w-full max-w-md m-4 relative">
-            <h3 className="text-2xl font-black text-black uppercase mb-4 tracking-tighter">{confirmModal.title}</h3>
-            <p className="text-black font-medium mb-8 border-l-4 border-rose-700 pl-4">{confirmModal.message}</p>
-            <div className="flex flex-col sm:flex-row justify-end space-y-4 sm:space-y-0 sm:space-x-4">
-              <button onClick={() => setConfirmModal({ isOpen: false, title: '', message: '', onConfirm: null })} className="px-6 py-3 bg-white text-black font-black uppercase border-4 border-black hover:bg-gray-100 shadow-[4px_4px_0_0_rgba(0,0,0,1)] transition-transform active:translate-y-1 active:shadow-none text-center">Cancelar</button>
-              <button onClick={confirmModal.onConfirm} className="px-6 py-3 bg-rose-700 text-white font-black uppercase border-4 border-black hover:bg-rose-800 shadow-[4px_4px_0_0_rgba(0,0,0,1)] transition-transform active:translate-y-1 active:shadow-none flex items-center justify-center"><CheckCircleIcon className="h-5 w-5 mr-2" /> Confirmar</button>
+        <nav className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4 mb-6 md:mb-8">
+          <button onClick={() => setView('dashboard')} className={`${mondrianButton} ${view === 'dashboard' ? 'bg-[#DCAE1D] text-[#1A1A1A]' : `${t.cardBg} ${t.text}`}`}>
+            <Icon name="dashboard" size={20} /> <span className="truncate">Dashboard</span>
+          </button>
+          <button onClick={() => setView('directory')} className={`${mondrianButton} ${view === 'directory' ? 'bg-[#007577] text-white' : `${t.cardBg} ${t.text}`}`}>
+            <Icon name="directory" size={20} /> <span className="truncate">Diretório</span>
+          </button>
+          <button onClick={() => setView('settings')} className={`${mondrianButton} ${view === 'settings' ? 'bg-[#B32033] text-white' : `${t.cardBg} ${t.text}`}`}>
+            <Icon name={isSettingsUnlocked ? "settings" : "lock"} size={20} /> <span className="truncate">Ajustes</span>
+          </button>
+        </nav>
+
+        <main>
+          {view === 'dashboard' && renderDashboard()}
+          {view === 'directory' && renderDirectory()}
+          {view === 'settings' && renderSettings()}
+        </main>
+      </div>
+
+      {renderModal()}
+      
+      {dialog && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animation-fade-in">
+          <div className={`${mondrianCard} w-full max-w-sm p-6 text-center shadow-2xl`}>
+            <Icon name="alert" size={48} className={`mx-auto mb-4 ${dialog.type === 'confirm' ? 'text-[#DCAE1D]' : 'text-[#B32033]'}`} />
+            <p className={`font-bold text-lg mb-6 ${t.text}`}>{dialog.message}</p>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              {dialog.type === 'confirm' && (
+                <button onClick={() => setDialog(null)} className={`${mondrianButton} ${t.inputBgAlt} ${t.text} flex-1`}>
+                  Cancelar
+                </button>
+              )}
+              <button 
+                onClick={() => {
+                  if (dialog.onConfirm) dialog.onConfirm();
+                  else setDialog(null);
+                }} 
+                className={`${mondrianButton} ${dialog.type === 'confirm' ? 'bg-[#B32033]' : 'bg-[#007577]'} text-white flex-1`}
+              >
+                {dialog.type === 'confirm' ? 'Apagar' : 'OK'}
+              </button>
             </div>
           </div>
         </div>
