@@ -53,25 +53,42 @@ const Icon = ({ name, size = 24, className = "" }) => {
   );
 };
 
-// Coordenadas REAIS Longitude/Latitude para sobreposição perfeita no polígono GeoJSON da Ilha
-const MAP_COORDINATES_FLN = {
-  "Centro": [-48.5482, -27.5954],
-  "Sul da Ilha": [-48.5200, -27.7000],
-  "Campeche": [-48.4900, -27.6800],
-  "Armação": [-48.5000, -27.7500],
-  "Rio Tavares": [-48.4800, -27.6500],
-  "Norte da Ilha": [-48.4500, -27.4500],
-  "Ingleses": [-48.3900, -27.4300],
-  "Canasvieiras": [-48.4600, -27.4300],
-  "Continente": [-48.5800, -27.5900],
-  "Coqueiros": [-48.5800, -27.6000],
-  "Lagoa da Conceição": [-48.4500, -27.6000],
-  "Trindade": [-48.5200, -27.5800]
+// Dados Iniciais enquanto a planilha carrega (ou falha em carregar)
+const INITIAL_MOCK_DATA = [];
+
+const MAP_COORDINATES = {
+  SC: {
+    "Florianópolis": { x: 88, y: 55 },
+    "Santo Amaro da Imperatriz": { x: 85, y: 55 },
+    "São José": { x: 87, y: 54 },
+    "Palhoça": { x: 86, y: 56 },
+    "Joinville": { x: 85, y: 20 },
+    "Chapecó": { x: 15, y: 45 },
+    "Criciúma": { x: 80, y: 85 },
+    "Lages": { x: 55, y: 65 },
+    "Blumenau": { x: 75, y: 35 },
+    "Itajaí": { x: 85, y: 35 },
+    "Garopaba": { x: 87, y: 65 }
+  },
+  FLN: {
+    "Centro": { x: 45, y: 45 },
+    "Sul da Ilha": { x: 55, y: 75 },
+    "Campeche": { x: 58, y: 70 },
+    "Armação": { x: 60, y: 85 },
+    "Rio Tavares": { x: 55, y: 65 },
+    "Norte da Ilha": { x: 50, y: 20 },
+    "Ingleses": { x: 65, y: 15 },
+    "Canasvieiras": { x: 45, y: 10 },
+    "Continente": { x: 30, y: 42 },
+    "Coqueiros": { x: 32, y: 45 },
+    "Lagoa da Conceição": { x: 65, y: 45 },
+    "Trindade": { x: 48, y: 40 }
+  }
 };
 
 export default function App() {
   const [view, setView] = useState('dashboard');
-  const [contacts, setContacts] = useState([]);
+  const [contacts, setContacts] = useState(INITIAL_MOCK_DATA);
   const [selectedContact, setSelectedContact] = useState(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [formData, setFormData] = useState({});
@@ -81,51 +98,48 @@ export default function App() {
   const [mapScope, setMapScope] = useState('SC');
   const [directoryViewMode, setDirectoryViewMode] = useState('grid');
   
+  // ESTADOS DE FILTROS GLOBAIS
   const [searchTerm, setSearchTerm] = useState('');
   const [filterBase, setFilterBase] = useState('Todas');
   const [filterTemas, setFilterTemas] = useState('Todos');
   const [filterSituacao, setFilterSituacao] = useState('Todas');
   const [filterArticulador, setFilterArticulador] = useState('Todos');
   
+  // Filtros Condicionais Territoriais
   const [filterDistrito, setFilterDistrito] = useState('Todos');
   const [filterRegiao, setFilterRegiao] = useState('Todas');
   const [filterMunicipioBairro, setFilterMunicipioBairro] = useState('Todas');
 
   const [isSettingsUnlocked, setIsSettingsUnlocked] = useState(false);
   const [settingsPasswordInput, setSettingsPasswordInput] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
 
-  // Mapa Real
-  const [mapGeoJson, setMapGeoJson] = useState(null);
-  const [hoveredMapItem, setHoveredMapItem] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   // Inicialização Universal Sincronizada
   useEffect(() => {
-    // 1. Carrega dados do cache instantaneamente (se existirem) para o app já abrir com conteúdo
+    // 1. Carrega dados do cache local (se existirem) para não deixar a tela vazia
     const cachedData = localStorage.getItem('tabulum_liderancas_data');
     if (cachedData) {
-      setContacts(JSON.parse(cachedData));
+      try {
+        setContacts(JSON.parse(cachedData));
+      } catch (e) {}
     }
     
-    // 2. Dispara a sincronização silenciosa em background via API interna da Vercel
+    // 2. Dispara a sincronização via API interna da Vercel
     syncWithCloud();
-
-    // 3. Carregar o Mapa GeoJSON
-    fetch('https://raw.githubusercontent.com/tbrugz/geodata-br/master/geojson/geojs-42-mun.json')
-      .then(res => res.json())
-      .then(data => setMapGeoJson(data))
-      .catch(err => console.error("Erro ao carregar mapa real:", err));
   }, []);
 
   useEffect(() => {
     document.documentElement.style.setProperty('--border-color', isDarkMode ? '#F4F4F0' : '#1A1A1A');
   }, [isDarkMode]);
 
+  // Reseta os sub-filtros territoriais sempre que a Base mudar
   useEffect(() => {
     setFilterDistrito('Todos');
     setFilterRegiao('Todas');
     setFilterMunicipioBairro('Todas');
     
+    // Auto-Ajusta o Mapa
     if (filterBase === 'Base Florianópolis') setMapScope('FLN');
     else if (filterBase === 'Base Santa Catarina') setMapScope('SC');
   }, [filterBase]);
@@ -149,6 +163,7 @@ export default function App() {
   const situacoesExtraidas = ['Todas', ...new Set(contacts.map(c => c.situacao).filter(Boolean))].sort();
   const articuladoresExtraidos = ['Todos', ...new Set(contacts.map(c => c.articulador).filter(Boolean))].sort();
   
+  // Condicionais baseados nos contatos totais da base específica
   const distritosExtraidos = ['Todos', ...new Set(contacts.filter(c => c.base === 'Base Florianópolis').map(c => c.distrito).filter(Boolean))].sort();
   const bairrosExtraidos = ['Todas', ...new Set(contacts.filter(c => c.base === 'Base Florianópolis').map(c => c.municipio_bairro).filter(Boolean))].sort();
   const regioesExtraidas = ['Todas', ...new Set(contacts.filter(c => c.base === 'Base Santa Catarina').map(c => c.regiao).filter(Boolean))].sort();
@@ -285,12 +300,14 @@ export default function App() {
     const floripaCount = dashboardContacts.filter(c => c.base === 'Base Florianópolis').length;
     const scCount = dashboardContacts.filter(c => c.base === 'Base Santa Catarina').length;
     
+    // Temas
     const temaCounts = dashboardContacts.reduce((acc, curr) => {
       if(curr.temas) acc[curr.temas] = (acc[curr.temas] || 0) + 1;
       return acc;
     }, {});
     const topTemas = Object.entries(temaCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
 
+    // Situação
     const situacaoCounts = dashboardContacts.reduce((acc, curr) => {
       if(curr.situacao) acc[curr.situacao] = (acc[curr.situacao] || 0) + 1;
       return acc;
@@ -298,26 +315,6 @@ export default function App() {
     const topSituacoes = Object.entries(situacaoCounts).sort((a, b) => a[0].localeCompare(b[0]));
 
     return { total: dashboardContacts.length, floripaCount, scCount, topTemas, topSituacoes };
-  }, [dashboardContacts]);
-
-  const contatosPorMuni = useMemo(() => {
-    const map = {};
-    dashboardContacts.forEach(c => {
-      if (c.base !== 'Base Santa Catarina') return;
-      const mName = normalizeStr(c.municipio_bairro);
-      if(mName) map[mName] = (map[mName] || 0) + 1;
-    });
-    return map;
-  }, [dashboardContacts]);
-
-  const contatosPorBairro = useMemo(() => {
-    const map = {};
-    dashboardContacts.forEach(c => {
-      if (c.base !== 'Base Florianópolis') return;
-      const bName = c.municipio_bairro;
-      if(bName) map[bName] = (map[bName] || 0) + 1;
-    });
-    return map;
   }, [dashboardContacts]);
 
   const SelectFilter = ({ label, value, onChange, options, isDark = false }) => (
@@ -342,157 +339,60 @@ export default function App() {
     return <span className={`px-2 py-1 text-[10px] md:text-xs font-bold rounded-md border-[2px] ${t.border} ${cor} truncate max-w-full block`}>{situacao}</span>;
   };
 
-  const renderRealMapSVG = () => {
-    if (!mapGeoJson) return <div className="p-8 text-center font-bold">Carregando Mapa Real de SC...</div>;
-
-    const gFpolis = ["Florianópolis", "São José", "Palhoça", "Biguaçu", "Santo Amaro da Imperatriz", "Governador Celso Ramos", "Antônio Carlos", "São Pedro de Alcântara", "Águas Mornas"];
-
-    const featuresToRender = mapGeoJson.features.filter(f =>
-      mapScope === 'SC' ? true : gFpolis.includes(f.properties.name)
-    );
-
-    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-    featuresToRender.forEach(f => {
-      const processRings = (rings) => {
-        rings.forEach(ring => ring.forEach(coord => {
-          if (coord[0] < minX) minX = coord[0];
-          if (coord[0] > maxX) maxX = coord[0];
-          if (coord[1] < minY) minY = coord[1];
-          if (coord[1] > maxY) maxY = coord[1];
-        }));
-      };
-      if (f.geometry.type === 'Polygon') processRings(f.geometry.coordinates);
-      else if (f.geometry.type === 'MultiPolygon') f.geometry.coordinates.forEach(processRings);
+  const renderHeatMap = () => {
+    const heatPoints = {};
+    dashboardContacts.forEach(c => {
+      if (mapScope === 'FLN' && c.base !== 'Base Florianópolis') return;
+      if (mapScope === 'SC' && c.base !== 'Base Santa Catarina') return; 
+      const locName = c.municipio_bairro;
+      const coords = MAP_COORDINATES[mapScope][locName];
+      if (coords) {
+        if (!heatPoints[locName]) heatPoints[locName] = { ...coords, count: 0, label: locName };
+        heatPoints[locName].count += 1;
+      }
     });
 
-    const mapWidth = 800;
-    const mapHeight = mapScope === 'SC' ? 550 : 700;
-    
-    const scaleX = mapWidth / (maxX - minX);
-    const scaleY = mapHeight / (maxY - minY);
-    const scale = Math.min(scaleX, scaleY) * 0.95; 
-    
-    const offsetX = (mapWidth - (maxX - minX) * scale) / 2;
-    const offsetY = (mapHeight - (maxY - minY) * scale) / 2;
-
-    const project = (coord) => {
-      const x = (coord[0] - minX) * scale + offsetX;
-      const y = mapHeight - ((coord[1] - minY) * scale) - offsetY;
-      return { x, y };
-    };
-
-    const generatePath = (geometry) => {
-      const createString = (rings) => rings.map(ring => "M" + ring.map(coord => {
-         const p = project(coord); return `${p.x},${p.y}`;
-      }).join("L") + "Z").join(" ");
-      if (geometry.type === 'Polygon') return createString(geometry.coordinates);
-      if (geometry.type === 'MultiPolygon') return geometry.coordinates.map(createString).join(" ");
-      return "";
-    };
-
-    const getMuniColor = (val) => {
-      if (!val || val === 0) return '#FFFFFF'; 
-      if (val < 2) return '#DCAE1D'; 
-      if (val < 5) return '#007577'; 
-      return '#B32033'; 
-    };
-
-    const handleMapClick = (base, municipioBairro) => {
-      setFilterBase(base);
-      setFilterDistrito('Todos');
-      setFilterRegiao('Todas');
-      setFilterMunicipioBairro(municipioBairro);
-      setView('directory');
-    };
+    const maxCount = Math.max(1, ...Object.values(heatPoints).map(p => p.count));
 
     return (
-      <div className={`${baseCard} ${t.cardBg} p-4 md:p-6 flex flex-col lg:col-span-3 shadow-mondrian`}>
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 border-b-[3px] pb-4 border-dashed border-gray-300 dark:border-gray-700">
-          <h3 className={`text-xl md:text-2xl font-bold flex items-center gap-2 w-full md:w-auto ${t.text}`}>
+      <div className={`${baseCard} bg-[#1A1A1A] p-4 md:p-6 flex flex-col lg:col-span-3 text-[#F4F4F0] overflow-hidden`}>
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+          <h3 className="text-xl md:text-2xl font-bold flex items-center gap-2 w-full md:w-auto">
             <Icon name="map" size={28} className="text-[#DCAE1D] shrink-0" /> 
-            <span className="truncate">Mapa de {mapScope === 'SC' ? 'Santa Catarina' : 'Florianópolis'}</span>
+            <span className="truncate">Densidade: {mapScope === 'SC' ? 'Santa Catarina' : 'Floripa'}</span>
           </h3>
-          <div className="flex items-center gap-4 flex-wrap w-full md:w-auto justify-between">
-            <div className="flex space-x-2 text-[10px] md:text-xs font-black uppercase items-center">
-                <span className={t.textMuted}>Legenda:</span>
-                <div className="w-3 h-3 bg-[#FFFFFF] border border-[#1A1A1A]"></div> <span className={t.textMuted}>Zero</span>
-                <div className="w-3 h-3 bg-[#DCAE1D] border border-[#1A1A1A] ml-2"></div> <span className={t.textMuted}>Baixo</span>
-                <div className="w-3 h-3 bg-[#007577] border border-[#1A1A1A] ml-2"></div> <span className={t.textMuted}>Médio</span>
-                <div className="w-3 h-3 bg-[#B32033] border border-[#1A1A1A] ml-2"></div> <span className={t.textMuted}>Alto</span>
-            </div>
-            <div className={`flex border-[3px] ${t.border} rounded-lg overflow-hidden shrink-0`}>
-              <button onClick={() => setMapScope('SC')} className={`px-4 py-2 font-bold transition-colors ${mapScope === 'SC' ? 'bg-[#DCAE1D] text-[#1A1A1A]' : `bg-transparent hover:bg-gray-200 dark:hover:bg-gray-700 ${t.text}`}`}>SC</button>
-              <div className={`w-[3px] ${t.border}`}></div>
-              <button onClick={() => setMapScope('FLN')} className={`px-4 py-2 font-bold transition-colors ${mapScope === 'FLN' ? 'bg-[#007577] text-white' : `bg-transparent hover:bg-gray-200 dark:hover:bg-gray-700 ${t.text}`}`}>Floripa</button>
-            </div>
+          <div className="flex border-[3px] border-[#F4F4F0] rounded-lg overflow-hidden shrink-0 w-full md:w-auto">
+            <button onClick={() => setMapScope('SC')} className={`flex-1 px-4 py-2 font-bold transition-colors ${mapScope === 'SC' ? 'bg-[#DCAE1D] text-[#1A1A1A]' : 'bg-transparent text-[#F4F4F0] hover:bg-gray-800'}`}>SC</button>
+            <div className="w-[3px] bg-[#F4F4F0]"></div>
+            <button onClick={() => setMapScope('FLN')} className={`flex-1 px-4 py-2 font-bold transition-colors ${mapScope === 'FLN' ? 'bg-[#007577] text-white' : 'bg-transparent text-[#F4F4F0] hover:bg-gray-800'}`}>Floripa</button>
           </div>
         </div>
-
-        <div className={`relative w-full ${mapScope === 'SC' ? 'aspect-video max-h-[550px]' : 'aspect-[4/3] max-h-[600px] max-w-[500px] mx-auto'} bg-[#EAEAEA] dark:bg-[#121212] rounded-xl border-[3px] ${t.border} overflow-hidden p-2`}>
-          <svg viewBox={`0 0 ${mapWidth} ${mapHeight}`} className="w-full h-full drop-shadow-md">
-            {featuresToRender.map((feature, i) => {
-              const mName = normalizeStr(feature.properties.name);
-              const val = contatosPorMuni[mName] || 0;
-              
-              let fillCol = getMuniColor(val);
-              if (mapScope === 'FLN') {
-                 fillCol = '#FFFFFF';
-              }
-
-              return (
-                <path 
-                  key={i} d={generatePath(feature.geometry)}
-                  fill={fillCol} 
-                  stroke={isDarkMode ? "#555" : "#1A1A1A"} 
-                  strokeWidth={mapScope === 'FLN' ? "1.5" : "1"}
-                  className={`transition-all ${mapScope === 'SC' ? 'hover:stroke-[3px] hover:fill-[#DCAE1D] cursor-pointer' : ''}`}
-                  onMouseEnter={(e) => {
-                    if (mapScope === 'SC') setHoveredMapItem({ name: feature.properties.name, val, x: e.clientX, y: e.clientY });
-                  }}
-                  onMouseLeave={() => setHoveredMapItem(null)}
-                  onClick={() => {
-                    if (mapScope === 'SC' && val > 0) {
-                      handleMapClick('Base Santa Catarina', feature.properties.name);
-                    }
-                  }}
-                />
-              );
-            })}
-
-            {mapScope === 'FLN' && Object.entries(contatosPorBairro).map(([bairro, count], i) => {
-                const coords = MAP_COORDINATES_FLN[bairro];
-                if (!coords) return null;
-                
-                const proj = project(coords);
-                const maxBairro = Math.max(1, ...Object.values(contatosPorBairro));
-                const intensity = count / maxBairro;
-                
-                const size = 12 + (intensity * 30); 
-                const color = '#B32033'; 
-
-                return (
-                  <g key={`bubble-${i}`} className="cursor-pointer group"
-                     onMouseEnter={(e) => setHoveredMapItem({ name: bairro, val: count, x: e.clientX, y: e.clientY })}
-                     onMouseLeave={() => setHoveredMapItem(null)}
-                     onClick={() => handleMapClick('Base Florianópolis', bairro)}
-                  >
-                    <circle cx={proj.x} cy={proj.y} r={size} fill={color} opacity="0.4" className="animate-pulse" />
-                    <circle cx={proj.x} cy={proj.y} r={size * 0.6} fill={color} stroke="#F4F4F0" strokeWidth="2" className="group-hover:stroke-4 transition-all" />
-                  </g>
-                );
-            })}
+        <div className={`relative w-full ${mapScope === 'SC' ? 'aspect-video max-h-[500px]' : 'aspect-[3/4] max-h-[500px] max-w-[400px] mx-auto'} bg-[#2A2A2A] rounded-lg border-2 border-gray-700 overflow-hidden`}>
+          <svg className="absolute inset-0 w-full h-full opacity-30 pointer-events-none" preserveAspectRatio="none" viewBox="0 0 100 100">
+            {mapScope === 'SC' ? (
+              <polygon points="5,45 35,30 65,20 85,10 95,40 98,55 90,85 75,95 55,75 25,65 5,60" fill="#007577" stroke="#F4F4F0" strokeWidth="1" strokeLinejoin="round" />
+            ) : (
+              <>
+                <polygon points="5,35 35,35 40,55 25,65 5,65" fill="#DCAE1D" stroke="#F4F4F0" strokeWidth="1" strokeLinejoin="round" />
+                <polygon points="45,15 65,10 75,40 85,70 70,95 55,85 50,60 40,40" fill="#007577" stroke="#F4F4F0" strokeWidth="1" strokeLinejoin="round" />
+              </>
+            )}
           </svg>
-
-          {hoveredMapItem && (
-            <div className="fixed bg-white border-[3px] border-[#1A1A1A] p-3 z-50 pointer-events-none transform -translate-x-1/2 -translate-y-full mt-[-10px] shadow-[4px_4px_0_0_rgba(0,0,0,1)]"
-                 style={{ left: hoveredMapItem.x, top: hoveredMapItem.y }}>
-              <p className="font-black text-[#B32033] uppercase text-sm">{hoveredMapItem.name}</p>
-              <p className="font-bold text-[#1A1A1A] text-xs mt-1">
-                {hoveredMapItem.val > 0 ? `${hoveredMapItem.val} Liderança(s)` : 'Sem contatos'}
-              </p>
-              {hoveredMapItem.val > 0 && <p className="text-[10px] text-[#007577] font-bold mt-1">Clique para filtrar &rarr;</p>}
-            </div>
-          )}
+          {Object.values(heatPoints).map((pt, i) => {
+            const intensity = pt.count / maxCount;
+            const size = 16 + (intensity * 40); 
+            const opacity = 0.5 + (intensity * 0.5);
+            const color = mapScope === 'FLN' ? '#DCAE1D' : '#B32033';
+            return (
+              <div key={i} className="absolute flex items-center justify-center transform -translate-x-1/2 -translate-y-1/2 group cursor-crosshair" style={{ top: `${pt.y}%`, left: `${pt.x}%`, width: size, height: size }}>
+                <div className="absolute inset-0 rounded-full animate-pulse" style={{ backgroundColor: color, opacity: opacity * 0.5 }}></div>
+                <div className="absolute inset-2 rounded-full border-2 border-white shadow-[0_0_10px_rgba(0,0,0,0.5)]" style={{ backgroundColor: color, opacity: opacity }}></div>
+                <div className="absolute top-full mt-2 w-max max-w-[150px] bg-[#F4F4F0] text-[#1A1A1A] text-xs font-bold px-2 py-1 rounded border-2 border-[#1A1A1A] opacity-0 group-hover:opacity-100 transition-opacity z-10 shadow-md">
+                  {pt.label}: {pt.count} contatos
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
     );
@@ -541,7 +441,7 @@ export default function App() {
           <p className="text-5xl font-black">{stats.scCount}</p>
         </div>
         
-        {renderRealMapSVG()}
+        {renderHeatMap()}
         
         <div className="col-span-1 sm:col-span-2 lg:col-span-3 grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className={`${mondrianCard} p-6 flex flex-col`}>
@@ -560,8 +460,8 @@ export default function App() {
                         <span className="truncate pr-4">{nome}</span>
                         <span className="shrink-0">{count} conts.</span>
                       </div>
-                      <div className={`h-4 w-full ${t.inputBgAlt} rounded-full border-[2px] ${t.border} overflow-hidden`}>
-                        <div className={`h-full ${colors[index % colors.length]} transition-all duration-1000 border-r-[2px] ${t.border}`} style={{ width: `${percentage}%` }}></div>
+                      <div className={`h-4 w-full ${t.inputBgAlt} rounded-full border-2 ${t.border} overflow-hidden`}>
+                        <div className={`h-full ${colors[index % colors.length]} transition-all duration-1000 border-r-2 ${t.border}`} style={{ width: `${percentage}%` }}></div>
                       </div>
                     </div>
                   );
@@ -593,8 +493,8 @@ export default function App() {
                         <span className="truncate pr-4">{nome}</span>
                         <span className="shrink-0">{count} conts.</span>
                       </div>
-                      <div className={`h-4 w-full ${t.inputBgAlt} rounded-full border-[2px] ${t.border} overflow-hidden`}>
-                        <div className={`h-full ${colorClass} transition-all duration-1000 border-r-[2px] ${t.border}`} style={{ width: `${percentage}%` }}></div>
+                      <div className={`h-4 w-full ${t.inputBgAlt} rounded-full border-2 ${t.border} overflow-hidden`}>
+                        <div className={`h-full ${colorClass} transition-all duration-1000 border-r-2 ${t.border}`} style={{ width: `${percentage}%` }}></div>
                       </div>
                     </div>
                   );
@@ -615,6 +515,7 @@ export default function App() {
       <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4">
         <h2 className={`text-xl md:text-2xl font-black flex items-center gap-2 ${t.text}`}><Icon name="directory"/> Diretório Base</h2>
         
+        {/* Toggle Grid/List e Adicionar */}
         <div className="flex gap-2 sm:gap-4 flex-col sm:flex-row w-full sm:w-auto">
           <div className={`flex border-[3px] ${t.border} rounded-xl overflow-hidden shadow-mondrian-btn ${t.inputBgAlt} w-full sm:w-auto`}>
             <button 
@@ -668,6 +569,7 @@ export default function App() {
 
           <SelectFilter label="Tema" value={filterTemas} onChange={e => setFilterTemas(e.target.value)} options={temasExtraidos} isDark={!isDarkMode} />
           <SelectFilter label="Situação" value={filterSituacao} onChange={e => setFilterSituacao(e.target.value)} options={situacoesExtraidas} isDark={!isDarkMode} />
+          <SelectFilter label="Articulador" value={filterArticulador} onChange={e => setFilterArticulador(e.target.value)} options={articuladoresExtraidos} isDark={!isDarkMode} />
         </div>
       </div>
 
@@ -678,6 +580,7 @@ export default function App() {
         </div>
       ) : (
         <>
+          {/* MODO GRADE (CARDS) */}
           {directoryViewMode === 'grid' && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredContacts.map(contact => (
@@ -702,11 +605,13 @@ export default function App() {
             </div>
           )}
 
+          {/* MODO LISTA (LINHAS) */}
           {directoryViewMode === 'list' && (
             <div className="flex flex-col gap-3">
               {filteredContacts.map(contact => (
                 <div key={contact.id} onClick={() => { setSelectedContact(contact); setIsEditMode(false); }} className={`${mondrianCard} relative overflow-hidden hover:-translate-y-1 hover:shadow-mondrian-btn cursor-pointer p-4 md:p-0 flex flex-col md:flex-row md:items-center gap-3 md:gap-0`}>
                   
+                  {/* Barra de Cor (Topo no Celular, Lateral no Desktop) */}
                   <div className={`h-2 w-full md:w-3 md:h-full absolute left-0 top-0 md:bottom-0 ${contact.base.includes('Florianópolis') ? 'bg-[#007577]' : 'bg-[#DCAE1D]'}`}></div>
 
                   <div className="md:pl-6 md:pr-4 md:py-4 flex-1 mt-2 md:mt-0">
@@ -788,7 +693,6 @@ export default function App() {
             <span className="text-[#B32033]"><Icon name="settings" size={32} /></span> Ajustes
           </h2>
 
-          {/* PAINEL DE CONFIGURAÇÕES ATUALIZADO */}
           <div className={`mb-8 md:mb-10 p-4 md:p-6 border-[3px] ${t.border} rounded-xl ${t.inputBgAlt}`}>
             <h3 className={`text-lg md:text-xl font-bold mb-4 flex items-center gap-2 ${t.text}`}>
                <Icon name="refresh" size={24} className="text-[#007577]" /> Sincronização em Nuvem
@@ -837,7 +741,7 @@ export default function App() {
                   <>
                     <h2 className={`text-2xl md:text-3xl font-black mb-2 ${t.text} pr-12 sm:pr-0 leading-tight`}>{selectedContact.lideranca}</h2>
                     <div className="flex gap-2 flex-wrap mt-2">
-                      <div className={`flex items-center gap-2 font-bold ${t.textMuted} ${t.inputBgAlt} w-fit px-3 py-1 rounded-md border-[2px] ${t.border} text-xs md:text-sm`}>
+                      <div className={`flex items-center gap-2 font-bold ${t.textMuted} ${t.inputBgAlt} w-fit px-3 py-1 rounded-md border-2 ${t.border} text-xs md:text-sm`}>
                         <Icon name="tag" size={14} /> {selectedContact.base}
                       </div>
                       <SituacaoBadge situacao={selectedContact.situacao} />
@@ -938,7 +842,7 @@ export default function App() {
             ) : (
               <>
                 {selectedContact.area_de_atuacao && (
-                  <div className={`mb-6 p-3 md:p-4 ${t.inputBgAlt} border-[2px] ${t.border} rounded-lg flex items-center gap-3`}>
+                  <div className={`mb-6 p-3 md:p-4 ${t.inputBgAlt} border-2 ${t.border} rounded-lg flex items-center gap-3`}>
                     <span className="text-[#DCAE1D] shrink-0"><Icon name="briefcase" size={24} /></span>
                     <div>
                       <p className={`font-bold text-base md:text-lg leading-tight ${t.text}`}>{selectedContact.area_de_atuacao}</p>
@@ -987,7 +891,7 @@ export default function App() {
                 </div>
                 <div className={`border-t-[3px] ${t.border} pt-4 md:pt-6`}>
                   <label className="text-[10px] md:text-xs font-bold text-gray-500 uppercase tracking-wider block mb-2">Observações</label>
-                  <div className={`${t.inputBgAlt} p-3 md:p-4 rounded-lg border-[2px] ${t.border} font-medium ${t.text} text-sm md:text-lg leading-relaxed whitespace-pre-wrap`}>
+                  <div className={`${t.inputBgAlt} p-3 md:p-4 rounded-lg border-2 ${t.border} font-medium ${t.text} text-sm md:text-lg leading-relaxed whitespace-pre-wrap`}>
                     {selectedContact.observacoes || 'Sem anotações.'}
                   </div>
                 </div>
@@ -1023,9 +927,9 @@ export default function App() {
             </div>
           </div>
           <div className="flex gap-2 relative z-10 self-start sm:self-auto ml-1 sm:ml-0 mt-2 sm:mt-0">
-            <span className={`h-3 w-3 md:h-4 md:w-4 rounded-sm border-[2px] ${t.border} bg-[#B32033]`}></span>
-            <span className={`h-3 w-3 md:h-4 md:w-4 rounded-sm border-[2px] ${t.border} bg-[#007577]`}></span>
-            <span className={`h-3 w-3 md:h-4 md:w-4 rounded-sm border-[2px] ${t.border} bg-[#DCAE1D]`}></span>
+            <span className={`h-3 w-3 md:h-4 md:w-4 rounded-sm border-2 ${t.border} bg-[#B32033]`}></span>
+            <span className={`h-3 w-3 md:h-4 md:w-4 rounded-sm border-2 ${t.border} bg-[#007577]`}></span>
+            <span className={`h-3 w-3 md:h-4 md:w-4 rounded-sm border-2 ${t.border} bg-[#DCAE1D]`}></span>
           </div>
         </header>
 
