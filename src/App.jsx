@@ -5,9 +5,13 @@ import React, { useState, useMemo, useEffect } from 'react';
 // ==========================================
 const GOOGLE_SHEETS_WEBAPP_URL = 
   (typeof process !== 'undefined' && process.env && process.env.REACT_APP_SHEETS_URL) || 
-  (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_SHEETS_URL) || 
   (typeof process !== 'undefined' && process.env && process.env.NEXT_PUBLIC_SHEETS_URL) || 
   ""; 
+
+function normalizeStr(str) {
+  if (!str) return '';
+  return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
+}
 
 const Icon = ({ name, size = 24, className = "" }) => {
   const icons = {
@@ -44,30 +48,38 @@ const Icon = ({ name, size = 24, className = "" }) => {
     unlock: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
   };
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" className={className}>
+    <svg 
+      xmlns="http://www.w3.org/2000/svg" 
+      width={size} height={size} 
+      viewBox="0 0 24 24" 
+      fill="none" 
+      stroke="currentColor" 
+      className={className}
+    >
       {icons[name] || icons['alert']}
     </svg>
   );
 };
-
-function normalizeStr(str) {
-  if (!str) return '';
-  return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
-}
 
 const INITIAL_MOCK_DATA = [
   { id: "mock_1", base: "Base Florianópolis", lideranca: "Fátima Lima", municipio_bairro: "Armação", regiao: "Sul", distrito: "Pântano do Sul", situacao: "3 - Pré alinhado", area_de_atuacao: "Cultura/Teatro", temas: "Cultura", tema_institucional: "FUNDO SOCIAL", articulador: "Guto", telefone: "48984692944", email: "costadelimafatima@gmail.com", observacoes: "" },
   { id: "mock_2", base: "Base Santa Catarina", lideranca: "Amilton", municipio_bairro: "Santo Amaro da Imperatriz", regiao: "GRANDE FLORIANÓPOLIS", distrito: "", situacao: "4 - Comprometido", area_de_atuacao: "Agricultor Orgânico", temas: "Agroecologia", tema_institucional: "AGRICULTURA", articulador: "Toninho", telefone: "48996905764", email: "", observacoes: "" },
 ];
 
-/* Coordenadas abstratas dos bairros de Floripa (em %) que usaremos para projetar as bolhas por cima do polígono real de Florianópolis */
-const MAP_COORDINATES = {
-  FLN: {
-    "Centro": { x: 45, y: 45 }, "Sul da Ilha": { x: 55, y: 75 }, "Campeche": { x: 58, y: 70 },
-    "Armação": { x: 60, y: 85 }, "Rio Tavares": { x: 55, y: 65 }, "Norte da Ilha": { x: 50, y: 20 },
-    "Ingleses": { x: 65, y: 15 }, "Canasvieiras": { x: 45, y: 10 }, "Continente": { x: 30, y: 42 },
-    "Coqueiros": { x: 32, y: 45 }, "Lagoa da Conceição": { x: 65, y: 45 }, "Trindade": { x: 48, y: 40 }
-  }
+// Coordenadas REAIS Longitude/Latitude para sobreposição perfeita no polígono GeoJSON da Ilha
+const MAP_COORDINATES_FLN = {
+  "Centro": [-48.5482, -27.5954],
+  "Sul da Ilha": [-48.5200, -27.7000],
+  "Campeche": [-48.4900, -27.6800],
+  "Armação": [-48.5000, -27.7500],
+  "Rio Tavares": [-48.4800, -27.6500],
+  "Norte da Ilha": [-48.4500, -27.4500],
+  "Ingleses": [-48.3900, -27.4300],
+  "Canasvieiras": [-48.4600, -27.4300],
+  "Continente": [-48.5800, -27.5900],
+  "Coqueiros": [-48.5800, -27.6000],
+  "Lagoa da Conceição": [-48.4500, -27.6000],
+  "Trindade": [-48.5200, -27.5800]
 };
 
 export default function App() {
@@ -77,14 +89,11 @@ export default function App() {
   const [isEditMode, setIsEditMode] = useState(false);
   const [formData, setFormData] = useState({});
   const [dialog, setDialog] = useState(null); 
-  const [mapGeoJson, setMapGeoJson] = useState(null);
-  const [hoveredMapItem, setHoveredMapItem] = useState(null);
   
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [mapScope, setMapScope] = useState('SC');
   const [directoryViewMode, setDirectoryViewMode] = useState('grid');
   
-  // ESTADOS DE FILTROS GLOBAIS
   const [searchTerm, setSearchTerm] = useState('');
   const [filterBase, setFilterBase] = useState('Todas');
   const [filterTemas, setFilterTemas] = useState('Todos');
@@ -101,10 +110,14 @@ export default function App() {
   const [localSyncUrl, setLocalSyncUrl] = useState(() => localStorage.getItem('tabulum_sync_url') || GOOGLE_SHEETS_WEBAPP_URL);
   const [isLoading, setIsLoading] = useState(false);
 
+  // Novo estado para o Mapa Real
+  const [mapGeoJson, setMapGeoJson] = useState(null);
+  const [hoveredMapItem, setHoveredMapItem] = useState(null);
+
   useEffect(() => {
     if (localSyncUrl) syncWithCloud();
 
-    // Carregar o Mapa Real (GeoJSON)
+    // Carregar o Mapa Real (GeoJSON de Santa Catarina)
     fetch('https://raw.githubusercontent.com/tbrugz/geodata-br/master/geojson/geojs-42-mun.json')
       .then(res => res.json())
       .then(data => setMapGeoJson(data))
@@ -119,6 +132,8 @@ export default function App() {
     setFilterDistrito('Todos');
     setFilterRegiao('Todas');
     setFilterMunicipioBairro('Todas');
+    
+    // Auto-Ajusta o Mapa
     if (filterBase === 'Base Florianópolis') setMapScope('FLN');
     else if (filterBase === 'Base Santa Catarina') setMapScope('SC');
   }, [filterBase]);
@@ -153,7 +168,9 @@ export default function App() {
     try {
       const res = await fetch(localSyncUrl);
       const data = await res.json();
-      if (Array.isArray(data)) setContacts(data);
+      if (Array.isArray(data)) {
+        setContacts(data);
+      }
     } catch (e) {
       console.error("Erro ao sincronizar:", e);
     } finally {
@@ -248,6 +265,7 @@ export default function App() {
       const matchesRegiao = filterRegiao === 'Todas' || contact.regiao === filterRegiao;
       const matchesDistrito = filterDistrito === 'Todos' || contact.distrito === filterDistrito;
       const matchesMunBairro = filterMunicipioBairro === 'Todas' || contact.municipio_bairro === filterMunicipioBairro;
+      
       return matchesBase && matchesArticulador && matchesRegiao && matchesDistrito && matchesMunBairro;
     });
   }, [contacts, filterBase, filterArticulador, filterRegiao, filterDistrito, filterMunicipioBairro]);
@@ -260,8 +278,10 @@ export default function App() {
       const localMatch = contact.municipio_bairro?.toLowerCase().includes(searchTerm.toLowerCase());
       const areaMatch = contact.area_de_atuacao?.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesSearch = nomeMatch || localMatch || areaMatch;
+      
       const matchesTemas = filterTemas === 'Todos' || contact.temas === filterTemas;
       const matchesSituacao = filterSituacao === 'Todas' || contact.situacao === filterSituacao;
+      
       return matchesSearch && matchesTemas && matchesSituacao;
     });
   }, [activeContacts, searchTerm, filterTemas, filterSituacao]);
@@ -269,11 +289,13 @@ export default function App() {
   const stats = useMemo(() => {
     const floripaCount = dashboardContacts.filter(c => c.base === 'Base Florianópolis').length;
     const scCount = dashboardContacts.filter(c => c.base === 'Base Santa Catarina').length;
+    
     const temaCounts = dashboardContacts.reduce((acc, curr) => {
       if(curr.temas) acc[curr.temas] = (acc[curr.temas] || 0) + 1;
       return acc;
     }, {});
     const topTemas = Object.entries(temaCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+
     const situacaoCounts = dashboardContacts.reduce((acc, curr) => {
       if(curr.situacao) acc[curr.situacao] = (acc[curr.situacao] || 0) + 1;
       return acc;
@@ -283,10 +305,34 @@ export default function App() {
     return { total: dashboardContacts.length, floripaCount, scCount, topTemas, topSituacoes };
   }, [dashboardContacts]);
 
+  const contatosPorMuni = useMemo(() => {
+    const map = {};
+    dashboardContacts.forEach(c => {
+      if (c.base !== 'Base Santa Catarina') return;
+      const mName = normalizeStr(c.municipio_bairro);
+      if(mName) map[mName] = (map[mName] || 0) + 1;
+    });
+    return map;
+  }, [dashboardContacts]);
+
+  const contatosPorBairro = useMemo(() => {
+    const map = {};
+    dashboardContacts.forEach(c => {
+      if (c.base !== 'Base Florianópolis') return;
+      const bName = c.municipio_bairro;
+      if(bName) map[bName] = (map[bName] || 0) + 1;
+    });
+    return map;
+  }, [dashboardContacts]);
+
   const SelectFilter = ({ label, value, onChange, options, isDark = false }) => (
     <div className="w-full sm:flex-1 min-w-[140px] flex flex-col gap-1.5">
       <label className={`font-bold text-xs md:text-sm uppercase tracking-wide ${isDark ? 'text-[#1A1A1A]' : t.textMuted}`}>{label}</label>
-      <select value={value} onChange={onChange} className={`w-full px-3 py-2.5 rounded-lg border-[3px] ${t.border} font-medium ${t.inputBg} ${t.text} truncate focus:outline-none focus:ring-2 focus:ring-[#B32033] shadow-sm`}>
+      <select 
+        value={value} 
+        onChange={onChange} 
+        className={`w-full px-3 py-2.5 rounded-lg border-[3px] ${t.border} font-medium ${t.inputBg} ${t.text} truncate focus:outline-none focus:ring-2 focus:ring-[#B32033] shadow-sm`}
+      >
         {options.map(o => <option key={o} value={o}>{o}</option>)}
       </select>
     </div>
@@ -298,94 +344,108 @@ export default function App() {
     if (situacao.includes("4 -")) cor = "bg-[#007577] text-white";
     else if (situacao.includes("3 -")) cor = "bg-[#DCAE1D] text-[#1A1A1A]";
     else if (situacao.includes("1 -") || situacao.includes("2 -")) cor = "bg-[#B32033] text-white";
-    return <span className={`px-2 py-1 text-[10px] md:text-xs font-bold rounded-md border-2 ${t.border} ${cor} truncate max-w-full block`}>{situacao}</span>;
+    return <span className={`px-2 py-1 text-[10px] md:text-xs font-bold rounded-md border-[2px] ${t.border} ${cor} truncate max-w-full block`}>{situacao}</span>;
   };
 
-  const renderHeatMap = () => {
-    // 1. Agrupar dados para SC (Por Município)
-    const contatosPorMuni = {};
-    dashboardContacts.forEach(c => {
-      if (c.base === 'Base Santa Catarina') {
-        const mName = normalizeStr(c.municipio_bairro);
-        if (mName) contatosPorMuni[mName] = (contatosPorMuni[mName] || 0) + 1;
-      }
+  const renderRealMapSVG = () => {
+    if (!mapGeoJson) return <div className="p-8 text-center font-bold">Carregando Mapa Real de SC...</div>;
+
+    // Se estiver no mapa da Ilha, mostramos apenas Floripa e a Grande Floripa no fundo para referência visual
+    const gFpolis = ["Florianópolis", "São José", "Palhoça", "Biguaçu", "Santo Amaro da Imperatriz", "Governador Celso Ramos", "Antônio Carlos", "São Pedro de Alcântara", "Águas Mornas"];
+
+    const featuresToRender = mapGeoJson.features.filter(f =>
+      mapScope === 'SC' ? true : gFpolis.includes(f.properties.name)
+    );
+
+    // Encontrar limites para projeção (Bounding Box)
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    featuresToRender.forEach(f => {
+      const processRings = (rings) => {
+        rings.forEach(ring => ring.forEach(coord => {
+          if (coord[0] < minX) minX = coord[0];
+          if (coord[0] > maxX) maxX = coord[0];
+          if (coord[1] < minY) minY = coord[1];
+          if (coord[1] > maxY) maxY = coord[1];
+        }));
+      };
+      if (f.geometry.type === 'Polygon') processRings(f.geometry.coordinates);
+      else if (f.geometry.type === 'MultiPolygon') f.geometry.coordinates.forEach(processRings);
     });
 
-    // 2. Agrupar dados para Floripa (Por Bairro/Distrito)
-    const contatosPorBairro = {};
-    dashboardContacts.forEach(c => {
-      if (c.base === 'Base Florianópolis') {
-        const bName = c.municipio_bairro;
-        if (bName) contatosPorBairro[bName] = (contatosPorBairro[bName] || 0) + 1;
-      }
-    });
+    const mapWidth = 800;
+    const mapHeight = mapScope === 'SC' ? 550 : 700; // Floripa precisa de mais altura
+    
+    const scaleX = mapWidth / (maxX - minX);
+    const scaleY = mapHeight / (maxY - minY);
+    const scale = Math.min(scaleX, scaleY) * 0.95; // Margem
+    
+    const offsetX = (mapWidth - (maxX - minX) * scale) / 2;
+    const offsetY = (mapHeight - (maxY - minY) * scale) / 2;
 
-    const getMuniColor = (val, dark) => {
-      if (!val || val === 0) return dark ? '#2A2A2A' : '#EAEAEA'; 
+    const project = (coord) => {
+      const x = (coord[0] - minX) * scale + offsetX;
+      const y = mapHeight - ((coord[1] - minY) * scale) - offsetY;
+      return { x, y };
+    };
+
+    const generatePath = (geometry) => {
+      const createString = (rings) => rings.map(ring => "M" + ring.map(coord => {
+         const p = project(coord); return `${p.x},${p.y}`;
+      }).join("L") + "Z").join(" ");
+      if (geometry.type === 'Polygon') return createString(geometry.coordinates);
+      if (geometry.type === 'MultiPolygon') return geometry.coordinates.map(createString).join(" ");
+      return "";
+    };
+
+    const getMuniColor = (val) => {
+      if (!val || val === 0) return '#FFFFFF'; // Branco obrigatório para zeros
       if (val < 2) return '#DCAE1D'; // Low
       if (val < 5) return '#007577'; // Medium
       return '#B32033'; // High
     };
 
-    const renderRealMapSVG = () => {
-      if (!mapGeoJson) return <div className="absolute inset-0 flex items-center justify-center font-bold text-gray-500 uppercase tracking-widest">Carregando Mapa...</div>;
+    const handleMapClick = (base, municipioBairro) => {
+      setFilterBase(base);
+      setFilterDistrito('Todos');
+      setFilterRegiao('Todas');
+      setFilterMunicipioBairro(municipioBairro);
+      setView('directory');
+    };
 
-      let featuresToRender = mapGeoJson.features;
-      
-      // Filtro de zoom para Floripa
-      if (mapScope === 'FLN') {
-        const targetMunis = ['Florianópolis', 'São José', 'Palhoça', 'Biguaçu'];
-        featuresToRender = mapGeoJson.features.filter(f => targetMunis.includes(f.properties.name));
-      }
+    return (
+      <div className={`${baseCard} ${t.cardBg} p-4 md:p-6 flex flex-col lg:col-span-3 shadow-mondrian`}>
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 border-b-[3px] pb-4 border-dashed border-gray-300 dark:border-gray-700">
+          <h3 className={`text-xl md:text-2xl font-bold flex items-center gap-2 w-full md:w-auto ${t.text}`}>
+            <Icon name="map" size={28} className="text-[#DCAE1D] shrink-0" /> 
+            <span className="truncate">Mapa de {mapScope === 'SC' ? 'Santa Catarina' : 'Florianópolis'}</span>
+          </h3>
+          <div className="flex items-center gap-4 flex-wrap w-full md:w-auto justify-between">
+            <div className="flex space-x-2 text-[10px] md:text-xs font-black uppercase items-center">
+                <span className={t.textMuted}>Legenda:</span>
+                <div className="w-3 h-3 bg-[#FFFFFF] border border-[#1A1A1A]"></div> <span className={t.textMuted}>Zero</span>
+                <div className="w-3 h-3 bg-[#DCAE1D] border border-[#1A1A1A] ml-2"></div> <span className={t.textMuted}>Baixo</span>
+                <div className="w-3 h-3 bg-[#007577] border border-[#1A1A1A] ml-2"></div> <span className={t.textMuted}>Médio</span>
+                <div className="w-3 h-3 bg-[#B32033] border border-[#1A1A1A] ml-2"></div> <span className={t.textMuted}>Alto</span>
+            </div>
+            <div className={`flex border-[3px] ${t.border} rounded-lg overflow-hidden shrink-0`}>
+              <button onClick={() => setMapScope('SC')} className={`px-4 py-2 font-bold transition-colors ${mapScope === 'SC' ? 'bg-[#DCAE1D] text-[#1A1A1A]' : `bg-transparent hover:bg-gray-200 dark:hover:bg-gray-700 ${t.text}`}`}>SC</button>
+              <div className={`w-[3px] ${t.border}`}></div>
+              <button onClick={() => setMapScope('FLN')} className={`px-4 py-2 font-bold transition-colors ${mapScope === 'FLN' ? 'bg-[#007577] text-white' : `bg-transparent hover:bg-gray-200 dark:hover:bg-gray-700 ${t.text}`}`}>Floripa</button>
+            </div>
+          </div>
+        </div>
 
-      // Descobrir limites para desenhar os paths
-      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-      featuresToRender.forEach(f => {
-        const processRings = (rings) => {
-          rings.forEach(ring => ring.forEach(coord => {
-            if (coord[0] < minX) minX = coord[0];
-            if (coord[0] > maxX) maxX = coord[0];
-            if (coord[1] < minY) minY = coord[1];
-            if (coord[1] > maxY) maxY = coord[1];
-          }));
-        };
-        if (f.geometry.type === 'Polygon') processRings(f.geometry.coordinates);
-        else if (f.geometry.type === 'MultiPolygon') f.geometry.coordinates.forEach(processRings);
-      });
-
-      const mapWidth = 800; const mapHeight = 600;
-      const scaleX = mapWidth / (maxX - minX);
-      const scaleY = mapHeight / (maxY - minY);
-      const scale = Math.min(scaleX, scaleY) * 0.95; // 5% margin padding
-      
-      const offsetX = (mapWidth - (maxX - minX) * scale) / 2;
-      const offsetY = (mapHeight - (maxY - minY) * scale) / 2;
-
-      const project = (coord) => {
-        const x = (coord[0] - minX) * scale + offsetX;
-        const y = mapHeight - ((coord[1] - minY) * scale) - offsetY;
-        return { x, y, str: `${x},${y}` };
-      };
-
-      const generatePath = (geometry) => {
-        const createString = (rings) => rings.map(ring => "M" + ring.map(coord => project(coord).str).join("L") + "Z").join(" ");
-        if (geometry.type === 'Polygon') return createString(geometry.coordinates);
-        if (geometry.type === 'MultiPolygon') return geometry.coordinates.map(createString).join(" ");
-        return "";
-      };
-
-      return (
-        <div className="relative w-full h-full flex items-center justify-center p-4">
-          <svg viewBox={`0 0 ${mapWidth} ${mapHeight}`} className="w-full h-auto max-h-[450px] drop-shadow-md">
+        <div className={`relative w-full ${mapScope === 'SC' ? 'aspect-video max-h-[550px]' : 'aspect-[4/3] max-h-[600px] max-w-[500px] mx-auto'} bg-[#EAEAEA] dark:bg-[#121212] rounded-xl border-[3px] ${t.border} overflow-hidden p-2`}>
+          <svg viewBox={`0 0 ${mapWidth} ${mapHeight}`} className="w-full h-full drop-shadow-md">
             {featuresToRender.map((feature, i) => {
               const mName = normalizeStr(feature.properties.name);
               const val = contatosPorMuni[mName] || 0;
-              const isFloripa = feature.properties.name === 'Florianópolis';
               
-              let fillCol = getMuniColor(val, isDarkMode);
-              // Quando olhamos pra Floripa, a base do polígono fica neutra para destacar as bolhas
+              // No modo SC, coloremos os municípios pelas Lideranças da Base SC.
+              // No modo FLN, deixamos os polígonos brancos (mapa base) para destacar as bolhas dos bairros.
+              let fillCol = getMuniColor(val);
               if (mapScope === 'FLN') {
-                 fillCol = isFloripa ? (isDarkMode ? '#1E1E1E' : '#FFFFFF') : (isDarkMode ? '#121212' : '#F0F0F0');
+                 fillCol = '#FFFFFF';
               }
 
               return (
@@ -393,99 +453,58 @@ export default function App() {
                   key={i} d={generatePath(feature.geometry)}
                   fill={fillCol} 
                   stroke={isDarkMode ? "#555" : "#1A1A1A"} 
-                  strokeWidth={mapScope === 'FLN' ? "2" : "1"}
-                  className={`transition-all ${mapScope === 'SC' ? 'hover:stroke-[3px] hover:fill-[#DCAE1D] cursor-crosshair' : ''}`}
+                  strokeWidth={mapScope === 'FLN' ? "1.5" : "1"}
+                  className={`transition-all ${mapScope === 'SC' ? 'hover:stroke-[3px] hover:fill-[#DCAE1D] cursor-pointer' : ''}`}
                   onMouseEnter={(e) => {
                     if (mapScope === 'SC') setHoveredMapItem({ name: feature.properties.name, val, x: e.clientX, y: e.clientY });
                   }}
                   onMouseLeave={() => setHoveredMapItem(null)}
+                  onClick={() => {
+                    if (mapScope === 'SC' && val > 0) {
+                      handleMapClick('Base Santa Catarina', feature.properties.name);
+                    }
+                  }}
                 />
               );
             })}
 
-            {/* Renderizar as bolhas (bubbles) do FLN por cima da Ilha */}
+            {/* Renderização das Bolhas (Bairros) quando estamos na Aba de Floripa */}
             {mapScope === 'FLN' && Object.entries(contatosPorBairro).map(([bairro, count], i) => {
-                const flnFeature = mapGeoJson.features.find(f => f.properties.name === 'Florianópolis');
-                if(!flnFeature) return null;
-
-                let fMinX = Infinity, fMaxX = -Infinity, fMinY = Infinity, fMaxY = -Infinity;
-                const processRings = (rings) => {
-                  rings.forEach(ring => ring.forEach(coord => {
-                    if (coord[0] < fMinX) fMinX = coord[0];
-                    if (coord[0] > fMaxX) fMaxX = coord[0];
-                    if (coord[1] < fMinY) fMinY = coord[1];
-                    if (coord[1] > fMaxY) fMaxY = coord[1];
-                  }));
-                };
-                if (flnFeature.geometry.type === 'Polygon') processRings(flnFeature.geometry.coordinates);
-                else if (flnFeature.geometry.type === 'MultiPolygon') flnFeature.geometry.coordinates.forEach(processRings);
-
-                const coords = MAP_COORDINATES.FLN[bairro];
+                const coords = MAP_COORDINATES_FLN[bairro];
                 if (!coords) return null;
-
-                // Mapear os percentuais abstratos (0-100) originais para a Bounding Box real de Floripa
-                const targetLon = fMinX + (coords.x / 100) * (fMaxX - fMinX);
-                const targetLat = fMaxY - (coords.y / 100) * (fMaxY - fMinY);
                 
-                const proj = project([targetLon, targetLat]);
-
-                const maxCount = Math.max(1, ...Object.values(contatosPorBairro));
-                const intensity = count / maxCount;
-                const size = 12 + (intensity * 25); 
-                const color = '#B32033'; // Rose vibrante sobre o mapa
+                const proj = project(coords);
+                const maxBairro = Math.max(1, ...Object.values(contatosPorBairro));
+                const intensity = count / maxBairro;
+                
+                const size = 12 + (intensity * 30); 
+                const color = '#B32033'; // Bolhas vermelhas sobre mapa branco
 
                 return (
-                  <g key={`bubble-${i}`} className="cursor-crosshair group"
+                  <g key={`bubble-${i}`} className="cursor-pointer group"
                      onMouseEnter={(e) => setHoveredMapItem({ name: bairro, val: count, x: e.clientX, y: e.clientY })}
                      onMouseLeave={() => setHoveredMapItem(null)}
+                     onClick={() => handleMapClick('Base Florianópolis', bairro)}
                   >
                     <circle cx={proj.x} cy={proj.y} r={size} fill={color} opacity="0.4" className="animate-pulse" />
-                    <circle cx={proj.x} cy={proj.y} r={size * 0.6} fill={color} stroke={isDarkMode ? "#1A1A1A" : "#F4F4F0"} strokeWidth="2" className="group-hover:stroke-4 transition-all" />
+                    <circle cx={proj.x} cy={proj.y} r={size * 0.6} fill={color} stroke="#F4F4F0" strokeWidth="2" className="group-hover:stroke-4 transition-all" />
                   </g>
                 );
             })}
           </svg>
-        </div>
-      );
-    };
 
-    return (
-      <div className={`${baseCard} ${t.cardBg} p-4 md:p-6 flex flex-col lg:col-span-3 overflow-hidden relative`}>
-        <div className={`flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 border-b-[3px] ${t.border} pb-4`}>
-          <h3 className={`text-xl md:text-2xl font-bold flex items-center gap-2 w-full md:w-auto ${t.text}`}>
-            <Icon name="map" size={28} className="text-[#DCAE1D] shrink-0" /> 
-            <span className="truncate">Mapa de {mapScope === 'SC' ? 'Santa Catarina' : 'Florianópolis'}</span>
-          </h3>
-          
-          <div className="flex items-center gap-4 text-xs font-bold uppercase tracking-wider w-full md:w-auto">
-            {mapScope === 'SC' && (
-              <div className={`hidden md:flex space-x-2 items-center ${t.textMuted}`}>
-                <span>Legenda:</span>
-                <div className={`w-3 h-3 bg-[#DCAE1D] border border-[${t.border}]`}></div> <span>Baixo</span>
-                <div className={`w-3 h-3 bg-[#007577] border border-[${t.border}]`}></div> <span>Médio</span>
-                <div className={`w-3 h-3 bg-[#B32033] border border-[${t.border}]`}></div> <span>Alto</span>
-              </div>
-            )}
-            
-            <div className={`flex border-[3px] ${t.border} rounded-lg overflow-hidden shrink-0 w-full md:w-auto ml-auto`}>
-              <button onClick={() => setMapScope('SC')} className={`flex-1 px-4 py-2 font-bold transition-colors ${mapScope === 'SC' ? 'bg-[#DCAE1D] text-[#1A1A1A]' : `bg-transparent hover:bg-gray-500/20 ${t.text}`}`}>SC</button>
-              <div className={`w-[3px] ${t.border}`}></div>
-              <button onClick={() => setMapScope('FLN')} className={`flex-1 px-4 py-2 font-bold transition-colors ${mapScope === 'FLN' ? 'bg-[#007577] text-white' : `bg-transparent hover:bg-gray-500/20 ${t.text}`}`}>Floripa</button>
+          {/* Tooltip Hover Responsivo */}
+          {hoveredMapItem && (
+            <div className="fixed bg-white border-[3px] border-[#1A1A1A] p-3 z-50 pointer-events-none transform -translate-x-1/2 -translate-y-full mt-[-10px] shadow-[4px_4px_0_0_rgba(0,0,0,1)]"
+                 style={{ left: hoveredMapItem.x, top: hoveredMapItem.y }}>
+              <p className="font-black text-[#B32033] uppercase text-sm">{hoveredMapItem.name}</p>
+              <p className="font-bold text-[#1A1A1A] text-xs mt-1">
+                {hoveredMapItem.val > 0 ? `${hoveredMapItem.val} Liderança(s)` : 'Sem contatos'}
+              </p>
+              {hoveredMapItem.val > 0 && <p className="text-[10px] text-[#007577] font-bold mt-1">Clique para filtrar &rarr;</p>}
             </div>
-          </div>
+          )}
         </div>
-        
-        <div className={`relative w-full ${t.inputBgAlt} rounded-lg border-[3px] ${t.border} overflow-hidden min-h-[400px]`}>
-          {renderRealMapSVG()}
-        </div>
-
-        {hoveredMapItem && (
-          <div className="fixed bg-white border-[3px] border-[#1A1A1A] p-3 shadow-mondrian z-50 pointer-events-none transform -translate-x-1/2 -translate-y-full mt-[-15px] text-[#1A1A1A]"
-               style={{ left: hoveredMapItem.x, top: hoveredMapItem.y }}>
-            <p className="font-black text-[#B32033] uppercase">{hoveredMapItem.name}</p>
-            <p className="font-bold text-sm">{hoveredMapItem.val > 0 ? `${hoveredMapItem.val} Contato(s)` : 'Sem contatos'}</p>
-          </div>
-        )}
       </div>
     );
   };
@@ -533,7 +552,8 @@ export default function App() {
           <p className="text-5xl font-black">{stats.scCount}</p>
         </div>
         
-        {renderHeatMap()}
+        {/* Substituíção feita aqui: Entra o Mapa Real */}
+        {renderRealMapSVG()}
         
         <div className="col-span-1 sm:col-span-2 lg:col-span-3 grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className={`${mondrianCard} p-6 flex flex-col`}>
@@ -552,8 +572,8 @@ export default function App() {
                         <span className="truncate pr-4">{nome}</span>
                         <span className="shrink-0">{count} conts.</span>
                       </div>
-                      <div className={`h-4 w-full ${t.inputBgAlt} rounded-full border-2 ${t.border} overflow-hidden`}>
-                        <div className={`h-full ${colors[index % colors.length]} transition-all duration-1000 border-r-2 ${t.border}`} style={{ width: `${percentage}%` }}></div>
+                      <div className={`h-4 w-full ${t.inputBgAlt} rounded-full border-[2px] ${t.border} overflow-hidden`}>
+                        <div className={`h-full ${colors[index % colors.length]} transition-all duration-1000 border-r-[2px] ${t.border}`} style={{ width: `${percentage}%` }}></div>
                       </div>
                     </div>
                   );
@@ -585,8 +605,8 @@ export default function App() {
                         <span className="truncate pr-4">{nome}</span>
                         <span className="shrink-0">{count} conts.</span>
                       </div>
-                      <div className={`h-4 w-full ${t.inputBgAlt} rounded-full border-2 ${t.border} overflow-hidden`}>
-                        <div className={`h-full ${colorClass} transition-all duration-1000 border-r-2 ${t.border}`} style={{ width: `${percentage}%` }}></div>
+                      <div className={`h-4 w-full ${t.inputBgAlt} rounded-full border-[2px] ${t.border} overflow-hidden`}>
+                        <div className={`h-full ${colorClass} transition-all duration-1000 border-r-[2px] ${t.border}`} style={{ width: `${percentage}%` }}></div>
                       </div>
                     </div>
                   );
@@ -607,6 +627,7 @@ export default function App() {
       <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4">
         <h2 className={`text-xl md:text-2xl font-black flex items-center gap-2 ${t.text}`}><Icon name="directory"/> Diretório Base</h2>
         
+        {/* Toggle Grid/List e Adicionar */}
         <div className="flex gap-2 sm:gap-4 flex-col sm:flex-row w-full sm:w-auto">
           <div className={`flex border-[3px] ${t.border} rounded-xl overflow-hidden shadow-mondrian-btn ${t.inputBgAlt} w-full sm:w-auto`}>
             <button 
@@ -632,35 +653,34 @@ export default function App() {
         </div>
       </div>
 
-      <div className={`${mondrianCard} p-4 md:p-6 bg-[#DCAE1D] flex flex-col gap-4`}>
+      <div className={`${mondrianCard} p-4 md:p-6 bg-[#DCAE1D] dark:bg-[#B32033] flex flex-col gap-4`}>
         <div className="flex flex-col md:flex-row gap-4 items-end flex-wrap">
           <div className="w-full md:flex-1 min-w-[200px] flex flex-col gap-1.5">
-            <label className="font-bold text-[#1A1A1A] text-xs md:text-sm uppercase tracking-wide">Buscar</label>
+            <label className="font-bold text-[#1A1A1A] dark:text-white text-xs md:text-sm uppercase tracking-wide">Buscar</label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-500"><Icon name="search" size={20} /></div>
               <input type="text" placeholder="Nome, área..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className={`w-full pl-10 pr-3 py-2.5 rounded-lg border-[3px] ${t.border} focus:outline-none focus:ring-2 focus:ring-[#B32033] font-medium ${t.inputBg} ${t.text} shadow-sm`} />
             </div>
           </div>
           
-          <SelectFilter label="Base" value={filterBase} onChange={e => setFilterBase(e.target.value)} options={bases} isDark={true} />
+          <SelectFilter label="Base" value={filterBase} onChange={e => setFilterBase(e.target.value)} options={bases} isDark={!isDarkMode} />
           
           {filterBase === 'Base Florianópolis' && (
             <>
-              <SelectFilter label="Distrito" value={filterDistrito} onChange={e => setFilterDistrito(e.target.value)} options={distritosExtraidos} isDark={true} />
-              <SelectFilter label="Bairro" value={filterMunicipioBairro} onChange={e => setFilterMunicipioBairro(e.target.value)} options={bairrosExtraidos} isDark={true} />
+              <SelectFilter label="Distrito" value={filterDistrito} onChange={e => setFilterDistrito(e.target.value)} options={distritosExtraidos} isDark={!isDarkMode} />
+              <SelectFilter label="Bairro" value={filterMunicipioBairro} onChange={e => setFilterMunicipioBairro(e.target.value)} options={bairrosExtraidos} isDark={!isDarkMode} />
             </>
           )}
 
           {filterBase === 'Base Santa Catarina' && (
             <>
-              <SelectFilter label="Região" value={filterRegiao} onChange={e => setFilterRegiao(e.target.value)} options={regioesExtraidas} isDark={true} />
-              <SelectFilter label="Município" value={filterMunicipioBairro} onChange={e => setFilterMunicipioBairro(e.target.value)} options={municipiosExtraidos} isDark={true} />
+              <SelectFilter label="Região" value={filterRegiao} onChange={e => setFilterRegiao(e.target.value)} options={regioesExtraidas} isDark={!isDarkMode} />
+              <SelectFilter label="Município" value={filterMunicipioBairro} onChange={e => setFilterMunicipioBairro(e.target.value)} options={municipiosExtraidos} isDark={!isDarkMode} />
             </>
           )}
 
-          <SelectFilter label="Tema" value={filterTemas} onChange={e => setFilterTemas(e.target.value)} options={temasExtraidos} isDark={true} />
-          <SelectFilter label="Situação" value={filterSituacao} onChange={e => setFilterSituacao(e.target.value)} options={situacoesExtraidas} isDark={true} />
-          <SelectFilter label="Articulador" value={filterArticulador} onChange={e => setFilterArticulador(e.target.value)} options={articuladoresExtraidos} isDark={true} />
+          <SelectFilter label="Tema" value={filterTemas} onChange={e => setFilterTemas(e.target.value)} options={temasExtraidos} isDark={!isDarkMode} />
+          <SelectFilter label="Situação" value={filterSituacao} onChange={e => setFilterSituacao(e.target.value)} options={situacoesExtraidas} isDark={!isDarkMode} />
         </div>
       </div>
 
@@ -671,6 +691,7 @@ export default function App() {
         </div>
       ) : (
         <>
+          {/* MODO GRADE (CARDS) */}
           {directoryViewMode === 'grid' && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredContacts.map(contact => (
@@ -695,11 +716,13 @@ export default function App() {
             </div>
           )}
 
+          {/* MODO LISTA (LINHAS) */}
           {directoryViewMode === 'list' && (
             <div className="flex flex-col gap-3">
               {filteredContacts.map(contact => (
                 <div key={contact.id} onClick={() => { setSelectedContact(contact); setIsEditMode(false); }} className={`${mondrianCard} relative overflow-hidden hover:-translate-y-1 hover:shadow-mondrian-btn cursor-pointer p-4 md:p-0 flex flex-col md:flex-row md:items-center gap-3 md:gap-0`}>
                   
+                  {/* Barra de Cor */}
                   <div className={`h-2 w-full md:w-3 md:h-full absolute left-0 top-0 md:bottom-0 ${contact.base.includes('Florianópolis') ? 'bg-[#007577]' : 'bg-[#DCAE1D]'}`}></div>
 
                   <div className="md:pl-6 md:pr-4 md:py-4 flex-1 mt-2 md:mt-0">
@@ -727,7 +750,7 @@ export default function App() {
                   </div>
 
                   <div className="md:px-4 md:py-4 shrink-0 hidden md:flex items-center justify-center">
-                     <button className={`p-2 ${t.inputBgAlt} border-2 ${t.border} rounded-md hover:bg-[#B32033] hover:text-white transition-colors ${t.text}`}><Icon name="chevronright" size={16} /></button>
+                     <button className={`p-2 ${t.inputBgAlt} border-[2px] ${t.border} rounded-md hover:bg-[#B32033] hover:text-white transition-colors ${t.text}`}><Icon name="chevronright" size={16} /></button>
                   </div>
 
                 </div>
@@ -822,7 +845,7 @@ export default function App() {
 
   const renderModal = () => {
     if (!selectedContact) return null;
-    const inputClasses = `w-full px-3 py-2 mt-1 rounded border-2 ${t.border} font-medium ${t.inputBg} ${t.text} text-sm md:text-base focus:outline-none focus:ring-2 focus:ring-[#B32033]`;
+    const inputClasses = `w-full px-3 py-2 mt-1 rounded border-[2px] ${t.border} font-medium ${t.inputBg} ${t.text} text-sm md:text-base focus:outline-none focus:ring-2 focus:ring-[#B32033]`;
 
     return (
       <div className="fixed inset-0 z-[50] flex items-center justify-center p-2 sm:p-4 bg-black/70 backdrop-blur-sm animation-fade-in">
@@ -838,7 +861,7 @@ export default function App() {
                   <>
                     <h2 className={`text-2xl md:text-3xl font-black mb-2 ${t.text} pr-12 sm:pr-0 leading-tight`}>{selectedContact.lideranca}</h2>
                     <div className="flex gap-2 flex-wrap mt-2">
-                      <div className={`flex items-center gap-2 font-bold ${t.textMuted} ${t.inputBgAlt} w-fit px-3 py-1 rounded-md border-2 ${t.border} text-xs md:text-sm`}>
+                      <div className={`flex items-center gap-2 font-bold ${t.textMuted} ${t.inputBgAlt} w-fit px-3 py-1 rounded-md border-[2px] ${t.border} text-xs md:text-sm`}>
                         <Icon name="tag" size={14} /> {selectedContact.base}
                       </div>
                       <SituacaoBadge situacao={selectedContact.situacao} />
@@ -939,7 +962,7 @@ export default function App() {
             ) : (
               <>
                 {selectedContact.area_de_atuacao && (
-                  <div className={`mb-6 p-3 md:p-4 ${t.inputBgAlt} border-2 ${t.border} rounded-lg flex items-center gap-3`}>
+                  <div className={`mb-6 p-3 md:p-4 ${t.inputBgAlt} border-[2px] ${t.border} rounded-lg flex items-center gap-3`}>
                     <span className="text-[#DCAE1D] shrink-0"><Icon name="briefcase" size={24} /></span>
                     <div>
                       <p className={`font-bold text-base md:text-lg leading-tight ${t.text}`}>{selectedContact.area_de_atuacao}</p>
@@ -988,7 +1011,7 @@ export default function App() {
                 </div>
                 <div className={`border-t-[3px] ${t.border} pt-4 md:pt-6`}>
                   <label className="text-[10px] md:text-xs font-bold text-gray-500 uppercase tracking-wider block mb-2">Observações</label>
-                  <div className={`${t.inputBgAlt} p-3 md:p-4 rounded-lg border-2 ${t.border} font-medium ${t.text} text-sm md:text-lg leading-relaxed whitespace-pre-wrap`}>
+                  <div className={`${t.inputBgAlt} p-3 md:p-4 rounded-lg border-[2px] ${t.border} font-medium ${t.text} text-sm md:text-lg leading-relaxed whitespace-pre-wrap`}>
                     {selectedContact.observacoes || 'Sem anotações.'}
                   </div>
                 </div>
@@ -1024,9 +1047,9 @@ export default function App() {
             </div>
           </div>
           <div className="flex gap-2 relative z-10 self-start sm:self-auto ml-1 sm:ml-0 mt-2 sm:mt-0">
-            <span className={`h-3 w-3 md:h-4 md:w-4 rounded-sm border-2 ${t.border} bg-[#B32033]`}></span>
-            <span className={`h-3 w-3 md:h-4 md:w-4 rounded-sm border-2 ${t.border} bg-[#007577]`}></span>
-            <span className={`h-3 w-3 md:h-4 md:w-4 rounded-sm border-2 ${t.border} bg-[#DCAE1D]`}></span>
+            <span className={`h-3 w-3 md:h-4 md:w-4 rounded-sm border-[2px] ${t.border} bg-[#B32033]`}></span>
+            <span className={`h-3 w-3 md:h-4 md:w-4 rounded-sm border-[2px] ${t.border} bg-[#007577]`}></span>
+            <span className={`h-3 w-3 md:h-4 md:w-4 rounded-sm border-[2px] ${t.border} bg-[#DCAE1D]`}></span>
           </div>
         </header>
 
