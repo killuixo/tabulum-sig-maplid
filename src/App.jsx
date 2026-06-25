@@ -3,9 +3,9 @@ import React, { useState, useEffect, useMemo } from 'react';
 // ==========================================
 // CONFIGURAÇÃO DE URL SEGURA
 // ==========================================
+// Removida a verificação import.meta para evitar erros de compilação no Vercel (es2015 target)
 const GOOGLE_SHEETS_WEBAPP_URL = 
   (typeof process !== 'undefined' && process.env && process.env.REACT_APP_SHEETS_URL) || 
-  (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_SHEETS_URL) || 
   (typeof process !== 'undefined' && process.env && process.env.NEXT_PUBLIC_SHEETS_URL) || 
   ""; 
 
@@ -758,4 +758,3 @@ export default function App() {
     </div>
   );
 }
-```eof
