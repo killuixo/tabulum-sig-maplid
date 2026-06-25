@@ -1,13 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
 
-// ==========================================
-// 🔗 CONFIGURAÇÃO DE URL SEGURA (VARIÁVEIS DE AMBIENTE)
-// ==========================================
-const GOOGLE_SHEETS_WEBAPP_URL = 
-  (typeof process !== 'undefined' && process.env && process.env.REACT_APP_SHEETS_URL) || 
-  (typeof process !== 'undefined' && process.env && process.env.NEXT_PUBLIC_SHEETS_URL) || 
-  ""; 
-
 function normalizeStr(str) {
   if (!str) return '';
   return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
@@ -61,11 +53,6 @@ const Icon = ({ name, size = 24, className = "" }) => {
   );
 };
 
-const INITIAL_MOCK_DATA = [
-  { id: "mock_1", base: "Base Florianópolis", lideranca: "Fátima Lima", municipio_bairro: "Armação", regiao: "Sul", distrito: "Pântano do Sul", situacao: "3 - Pré alinhado", area_de_atuacao: "Cultura/Teatro", temas: "Cultura", tema_institucional: "FUNDO SOCIAL", articulador: "Guto", telefone: "48984692944", email: "costadelimafatima@gmail.com", observacoes: "" },
-  { id: "mock_2", base: "Base Santa Catarina", lideranca: "Amilton", municipio_bairro: "Santo Amaro da Imperatriz", regiao: "GRANDE FLORIANÓPOLIS", distrito: "", situacao: "4 - Comprometido", area_de_atuacao: "Agricultor Orgânico", temas: "Agroecologia", tema_institucional: "AGRICULTURA", articulador: "Toninho", telefone: "48996905764", email: "", observacoes: "" },
-];
-
 // Coordenadas REAIS Longitude/Latitude para sobreposição perfeita no polígono GeoJSON da Ilha
 const MAP_COORDINATES_FLN = {
   "Centro": [-48.5482, -27.5954],
@@ -84,7 +71,7 @@ const MAP_COORDINATES_FLN = {
 
 export default function App() {
   const [view, setView] = useState('dashboard');
-  const [contacts, setContacts] = useState(INITIAL_MOCK_DATA);
+  const [contacts, setContacts] = useState([]);
   const [selectedContact, setSelectedContact] = useState(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [formData, setFormData] = useState({});
@@ -106,18 +93,24 @@ export default function App() {
 
   const [isSettingsUnlocked, setIsSettingsUnlocked] = useState(false);
   const [settingsPasswordInput, setSettingsPasswordInput] = useState('');
-
-  const [localSyncUrl, setLocalSyncUrl] = useState(() => localStorage.getItem('tabulum_sync_url') || GOOGLE_SHEETS_WEBAPP_URL);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Novo estado para o Mapa Real
+  // Mapa Real
   const [mapGeoJson, setMapGeoJson] = useState(null);
   const [hoveredMapItem, setHoveredMapItem] = useState(null);
 
+  // Inicialização Universal Sincronizada
   useEffect(() => {
-    if (localSyncUrl) syncWithCloud();
+    // 1. Carrega dados do cache instantaneamente (se existirem) para o app já abrir com conteúdo
+    const cachedData = localStorage.getItem('tabulum_liderancas_data');
+    if (cachedData) {
+      setContacts(JSON.parse(cachedData));
+    }
+    
+    // 2. Dispara a sincronização silenciosa em background via API interna da Vercel
+    syncWithCloud();
 
-    // Carregar o Mapa Real (GeoJSON de Santa Catarina)
+    // 3. Carregar o Mapa GeoJSON
     fetch('https://raw.githubusercontent.com/tbrugz/geodata-br/master/geojson/geojs-42-mun.json')
       .then(res => res.json())
       .then(data => setMapGeoJson(data))
@@ -133,7 +126,6 @@ export default function App() {
     setFilterRegiao('Todas');
     setFilterMunicipioBairro('Todas');
     
-    // Auto-Ajusta o Mapa
     if (filterBase === 'Base Florianópolis') setMapScope('FLN');
     else if (filterBase === 'Base Santa Catarina') setMapScope('SC');
   }, [filterBase]);
@@ -162,35 +154,37 @@ export default function App() {
   const regioesExtraidas = ['Todas', ...new Set(contacts.filter(c => c.base === 'Base Santa Catarina').map(c => c.regiao).filter(Boolean))].sort();
   const municipiosExtraidos = ['Todas', ...new Set(contacts.filter(c => c.base === 'Base Santa Catarina').map(c => c.municipio_bairro).filter(Boolean))].sort();
 
+  // COMUNICAÇÃO SEGURA COM A VERCEL (PROXY)
   const syncWithCloud = async () => {
-    if (!localSyncUrl) return;
     setIsLoading(true);
     try {
-      const res = await fetch(localSyncUrl);
-      const data = await res.json();
-      if (Array.isArray(data)) {
-        setContacts(data);
+      const res = await fetch('/api/liderancas');
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setContacts(data);
+          localStorage.setItem('tabulum_liderancas_data', JSON.stringify(data));
+        }
       }
     } catch (e) {
-      console.error("Erro ao sincronizar:", e);
+      console.error("Erro ao sincronizar via API:", e);
     } finally {
       setIsLoading(false);
     }
   };
 
   const saveToCloud = async (action, dataPayload) => {
-    if (!localSyncUrl) return;
     setIsLoading(true);
     try {
-      await fetch(localSyncUrl, {
+      await fetch('/api/liderancas', {
         method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ _action: action, ...dataPayload })
       });
-      await syncWithCloud();
+      await syncWithCloud(); // Resincroniza para garantir que todos tenham a versão mais recente
     } catch (e) {
-      console.error("Erro ao salvar na nuvem:", e);
-      setDialog({ type: 'alert', message: "Ocorreu um erro ao comunicar com a planilha. Verifique a URL." });
+      console.error("Erro ao salvar via API:", e);
+      setDialog({ type: 'alert', message: "Ocorreu um erro ao comunicar com o servidor interno." });
     } finally {
       setIsLoading(false);
     }
@@ -200,6 +194,7 @@ export default function App() {
     const isNew = !formData.id;
     const contactToSave = { ...formData };
     
+    // Atualização otimista (UI rápida)
     if (isNew) {
       contactToSave.id = "temp_" + Date.now(); 
       setContacts(prev => [...prev, contactToSave]);
@@ -350,14 +345,12 @@ export default function App() {
   const renderRealMapSVG = () => {
     if (!mapGeoJson) return <div className="p-8 text-center font-bold">Carregando Mapa Real de SC...</div>;
 
-    // Se estiver no mapa da Ilha, mostramos apenas Floripa e a Grande Floripa no fundo para referência visual
     const gFpolis = ["Florianópolis", "São José", "Palhoça", "Biguaçu", "Santo Amaro da Imperatriz", "Governador Celso Ramos", "Antônio Carlos", "São Pedro de Alcântara", "Águas Mornas"];
 
     const featuresToRender = mapGeoJson.features.filter(f =>
       mapScope === 'SC' ? true : gFpolis.includes(f.properties.name)
     );
 
-    // Encontrar limites para projeção (Bounding Box)
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
     featuresToRender.forEach(f => {
       const processRings = (rings) => {
@@ -373,11 +366,11 @@ export default function App() {
     });
 
     const mapWidth = 800;
-    const mapHeight = mapScope === 'SC' ? 550 : 700; // Floripa precisa de mais altura
+    const mapHeight = mapScope === 'SC' ? 550 : 700;
     
     const scaleX = mapWidth / (maxX - minX);
     const scaleY = mapHeight / (maxY - minY);
-    const scale = Math.min(scaleX, scaleY) * 0.95; // Margem
+    const scale = Math.min(scaleX, scaleY) * 0.95; 
     
     const offsetX = (mapWidth - (maxX - minX) * scale) / 2;
     const offsetY = (mapHeight - (maxY - minY) * scale) / 2;
@@ -398,10 +391,10 @@ export default function App() {
     };
 
     const getMuniColor = (val) => {
-      if (!val || val === 0) return '#FFFFFF'; // Branco obrigatório para zeros
-      if (val < 2) return '#DCAE1D'; // Low
-      if (val < 5) return '#007577'; // Medium
-      return '#B32033'; // High
+      if (!val || val === 0) return '#FFFFFF'; 
+      if (val < 2) return '#DCAE1D'; 
+      if (val < 5) return '#007577'; 
+      return '#B32033'; 
     };
 
     const handleMapClick = (base, municipioBairro) => {
@@ -441,8 +434,6 @@ export default function App() {
               const mName = normalizeStr(feature.properties.name);
               const val = contatosPorMuni[mName] || 0;
               
-              // No modo SC, coloremos os municípios pelas Lideranças da Base SC.
-              // No modo FLN, deixamos os polígonos brancos (mapa base) para destacar as bolhas dos bairros.
               let fillCol = getMuniColor(val);
               if (mapScope === 'FLN') {
                  fillCol = '#FFFFFF';
@@ -468,7 +459,6 @@ export default function App() {
               );
             })}
 
-            {/* Renderização das Bolhas (Bairros) quando estamos na Aba de Floripa */}
             {mapScope === 'FLN' && Object.entries(contatosPorBairro).map(([bairro, count], i) => {
                 const coords = MAP_COORDINATES_FLN[bairro];
                 if (!coords) return null;
@@ -478,7 +468,7 @@ export default function App() {
                 const intensity = count / maxBairro;
                 
                 const size = 12 + (intensity * 30); 
-                const color = '#B32033'; // Bolhas vermelhas sobre mapa branco
+                const color = '#B32033'; 
 
                 return (
                   <g key={`bubble-${i}`} className="cursor-pointer group"
@@ -493,7 +483,6 @@ export default function App() {
             })}
           </svg>
 
-          {/* Tooltip Hover Responsivo */}
           {hoveredMapItem && (
             <div className="fixed bg-white border-[3px] border-[#1A1A1A] p-3 z-50 pointer-events-none transform -translate-x-1/2 -translate-y-full mt-[-10px] shadow-[4px_4px_0_0_rgba(0,0,0,1)]"
                  style={{ left: hoveredMapItem.x, top: hoveredMapItem.y }}>
@@ -552,7 +541,6 @@ export default function App() {
           <p className="text-5xl font-black">{stats.scCount}</p>
         </div>
         
-        {/* Substituíção feita aqui: Entra o Mapa Real */}
         {renderRealMapSVG()}
         
         <div className="col-span-1 sm:col-span-2 lg:col-span-3 grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -627,7 +615,6 @@ export default function App() {
       <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4">
         <h2 className={`text-xl md:text-2xl font-black flex items-center gap-2 ${t.text}`}><Icon name="directory"/> Diretório Base</h2>
         
-        {/* Toggle Grid/List e Adicionar */}
         <div className="flex gap-2 sm:gap-4 flex-col sm:flex-row w-full sm:w-auto">
           <div className={`flex border-[3px] ${t.border} rounded-xl overflow-hidden shadow-mondrian-btn ${t.inputBgAlt} w-full sm:w-auto`}>
             <button 
@@ -691,7 +678,6 @@ export default function App() {
         </div>
       ) : (
         <>
-          {/* MODO GRADE (CARDS) */}
           {directoryViewMode === 'grid' && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredContacts.map(contact => (
@@ -708,7 +694,7 @@ export default function App() {
                     </div>
                     <div className={`mt-auto pt-4 border-t-2 border-dashed ${isDarkMode ? 'border-gray-700' : 'border-gray-300'} flex flex-wrap gap-2 items-center justify-between`}>
                       <span className={`text-[10px] md:text-xs font-bold truncate max-w-[70%] ${t.textMuted}`}><Icon name="tag" size={12} className="inline mr-1"/>{contact.temas || 'S/ Tema'}</span>
-                      <button className={`p-2 ${t.inputBgAlt} border-2 ${t.border} rounded-md hover:bg-[#B32033] hover:text-white transition-colors shrink-0 ${t.text}`}><Icon name="chevronright" size={16} /></button>
+                      <button className={`p-2 ${t.inputBgAlt} border-[2px] ${t.border} rounded-md hover:bg-[#B32033] hover:text-white transition-colors shrink-0 ${t.text}`}><Icon name="chevronright" size={16} /></button>
                     </div>
                   </div>
                 </div>
@@ -716,13 +702,11 @@ export default function App() {
             </div>
           )}
 
-          {/* MODO LISTA (LINHAS) */}
           {directoryViewMode === 'list' && (
             <div className="flex flex-col gap-3">
               {filteredContacts.map(contact => (
                 <div key={contact.id} onClick={() => { setSelectedContact(contact); setIsEditMode(false); }} className={`${mondrianCard} relative overflow-hidden hover:-translate-y-1 hover:shadow-mondrian-btn cursor-pointer p-4 md:p-0 flex flex-col md:flex-row md:items-center gap-3 md:gap-0`}>
                   
-                  {/* Barra de Cor */}
                   <div className={`h-2 w-full md:w-3 md:h-full absolute left-0 top-0 md:bottom-0 ${contact.base.includes('Florianópolis') ? 'bg-[#007577]' : 'bg-[#DCAE1D]'}`}></div>
 
                   <div className="md:pl-6 md:pr-4 md:py-4 flex-1 mt-2 md:mt-0">
@@ -804,31 +788,23 @@ export default function App() {
             <span className="text-[#B32033]"><Icon name="settings" size={32} /></span> Ajustes
           </h2>
 
+          {/* PAINEL DE CONFIGURAÇÕES ATUALIZADO */}
           <div className={`mb-8 md:mb-10 p-4 md:p-6 border-[3px] ${t.border} rounded-xl ${t.inputBgAlt}`}>
             <h3 className={`text-lg md:text-xl font-bold mb-4 flex items-center gap-2 ${t.text}`}>
-               <Icon name="refresh" size={24} className="text-[#007577]" /> Sincronização Google Sheets
+               <Icon name="refresh" size={24} className="text-[#007577]" /> Sincronização em Nuvem
             </h3>
-            <p className={`mb-4 text-xs md:text-sm font-medium ${t.textMuted}`}>
-              A URL primária está sendo puxada de forma segura através das Variáveis de Ambiente do servidor. Abaixo, você pode testar temporariamente outra URL.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-3 mb-2">
-              <input 
-                type="text" 
-                value={localSyncUrl} 
-                onChange={(e) => {
-                  setLocalSyncUrl(e.target.value);
-                  localStorage.setItem('tabulum_sync_url', e.target.value);
-                }}
-                placeholder="https://script.google.com/macros/s/..." 
-                className={`w-full px-4 py-3 rounded-lg border-[3px] ${t.border} font-medium ${t.inputBg} ${t.text} focus:outline-none focus:ring-2 focus:ring-[#B32033]`}
-              />
-              <button onClick={syncWithCloud} disabled={isLoading || !localSyncUrl} className={`${mondrianButton} bg-[#007577] text-white w-full sm:w-auto shrink-0`}>
-                <Icon name="refresh" size={20} className={isLoading ? "animate-spin" : ""} /> {isLoading ? 'Aguarde' : 'Sincronizar'}
-              </button>
+            
+            <div className="bg-[#DCAE1D] border-[3px] border-[#1A1A1A] text-[#1A1A1A] p-4 flex items-start shadow-[4px_4px_0_0_rgba(0,0,0,1)] rounded-lg mb-6">
+              <span className="shrink-0 mr-3 mt-1"><Icon name="alert" size={24} /></span>
+              <p className="text-sm font-bold leading-tight">
+                Modo de Segurança Máxima Ativado.<br/> 
+                A URL da planilha do Google agora é gerenciada exclusivamente pelo Servidor (Backend Vercel). Você não precisa e não deve configurá-la no navegador.
+              </p>
             </div>
-            {(!localSyncUrl) && (
-              <p className="text-xs text-[#B32033] font-bold">Variável de ambiente não detectada. Insira o link acima para testar.</p>
-            )}
+            
+            <button onClick={syncWithCloud} disabled={isLoading} className={`${mondrianButton} bg-[#007577] text-white w-full sm:w-auto`}>
+              <Icon name="refresh" size={20} className={isLoading ? "animate-spin" : ""} /> {isLoading ? 'Sincronizando...' : 'Forçar Sincronização Agora'}
+            </button>
           </div>
 
           <div className={`p-4 md:p-6 border-[3px] ${t.border} rounded-xl ${t.inputBgAlt}`}>
