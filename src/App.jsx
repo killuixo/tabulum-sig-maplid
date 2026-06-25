@@ -44,51 +44,29 @@ const Icon = ({ name, size = 24, className = "" }) => {
     unlock: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
   };
   return (
-    <svg 
-      xmlns="http://www.w3.org/2000/svg" 
-      width={size} height={size} 
-      viewBox="0 0 24 24" 
-      fill="none" 
-      stroke="currentColor" 
-      className={className}
-    >
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" className={className}>
       {icons[name] || icons['alert']}
     </svg>
   );
 };
+
+function normalizeStr(str) {
+  if (!str) return '';
+  return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
+}
 
 const INITIAL_MOCK_DATA = [
   { id: "mock_1", base: "Base Florianópolis", lideranca: "Fátima Lima", municipio_bairro: "Armação", regiao: "Sul", distrito: "Pântano do Sul", situacao: "3 - Pré alinhado", area_de_atuacao: "Cultura/Teatro", temas: "Cultura", tema_institucional: "FUNDO SOCIAL", articulador: "Guto", telefone: "48984692944", email: "costadelimafatima@gmail.com", observacoes: "" },
   { id: "mock_2", base: "Base Santa Catarina", lideranca: "Amilton", municipio_bairro: "Santo Amaro da Imperatriz", regiao: "GRANDE FLORIANÓPOLIS", distrito: "", situacao: "4 - Comprometido", area_de_atuacao: "Agricultor Orgânico", temas: "Agroecologia", tema_institucional: "AGRICULTURA", articulador: "Toninho", telefone: "48996905764", email: "", observacoes: "" },
 ];
 
+/* Coordenadas abstratas dos bairros de Floripa (em %) que usaremos para projetar as bolhas por cima do polígono real de Florianópolis */
 const MAP_COORDINATES = {
-  SC: {
-    "Florianópolis": { x: 88, y: 55 },
-    "Santo Amaro da Imperatriz": { x: 85, y: 55 },
-    "São José": { x: 87, y: 54 },
-    "Palhoça": { x: 86, y: 56 },
-    "Joinville": { x: 85, y: 20 },
-    "Chapecó": { x: 15, y: 45 },
-    "Criciúma": { x: 80, y: 85 },
-    "Lages": { x: 55, y: 65 },
-    "Blumenau": { x: 75, y: 35 },
-    "Itajaí": { x: 85, y: 35 },
-    "Garopaba": { x: 87, y: 65 }
-  },
   FLN: {
-    "Centro": { x: 45, y: 45 },
-    "Sul da Ilha": { x: 55, y: 75 },
-    "Campeche": { x: 58, y: 70 },
-    "Armação": { x: 60, y: 85 },
-    "Rio Tavares": { x: 55, y: 65 },
-    "Norte da Ilha": { x: 50, y: 20 },
-    "Ingleses": { x: 65, y: 15 },
-    "Canasvieiras": { x: 45, y: 10 },
-    "Continente": { x: 30, y: 42 },
-    "Coqueiros": { x: 32, y: 45 },
-    "Lagoa da Conceição": { x: 65, y: 45 },
-    "Trindade": { x: 48, y: 40 }
+    "Centro": { x: 45, y: 45 }, "Sul da Ilha": { x: 55, y: 75 }, "Campeche": { x: 58, y: 70 },
+    "Armação": { x: 60, y: 85 }, "Rio Tavares": { x: 55, y: 65 }, "Norte da Ilha": { x: 50, y: 20 },
+    "Ingleses": { x: 65, y: 15 }, "Canasvieiras": { x: 45, y: 10 }, "Continente": { x: 30, y: 42 },
+    "Coqueiros": { x: 32, y: 45 }, "Lagoa da Conceição": { x: 65, y: 45 }, "Trindade": { x: 48, y: 40 }
   }
 };
 
@@ -99,10 +77,12 @@ export default function App() {
   const [isEditMode, setIsEditMode] = useState(false);
   const [formData, setFormData] = useState({});
   const [dialog, setDialog] = useState(null); 
+  const [mapGeoJson, setMapGeoJson] = useState(null);
+  const [hoveredMapItem, setHoveredMapItem] = useState(null);
   
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [mapScope, setMapScope] = useState('SC');
-  const [directoryViewMode, setDirectoryViewMode] = useState('grid'); // 'grid' | 'list'
+  const [directoryViewMode, setDirectoryViewMode] = useState('grid');
   
   // ESTADOS DE FILTROS GLOBAIS
   const [searchTerm, setSearchTerm] = useState('');
@@ -111,7 +91,6 @@ export default function App() {
   const [filterSituacao, setFilterSituacao] = useState('Todas');
   const [filterArticulador, setFilterArticulador] = useState('Todos');
   
-  // Filtros Condicionais Territoriais
   const [filterDistrito, setFilterDistrito] = useState('Todos');
   const [filterRegiao, setFilterRegiao] = useState('Todas');
   const [filterMunicipioBairro, setFilterMunicipioBairro] = useState('Todas');
@@ -124,19 +103,22 @@ export default function App() {
 
   useEffect(() => {
     if (localSyncUrl) syncWithCloud();
+
+    // Carregar o Mapa Real (GeoJSON)
+    fetch('https://raw.githubusercontent.com/tbrugz/geodata-br/master/geojson/geojs-42-mun.json')
+      .then(res => res.json())
+      .then(data => setMapGeoJson(data))
+      .catch(err => console.error("Erro ao carregar mapa real:", err));
   }, []);
 
   useEffect(() => {
     document.documentElement.style.setProperty('--border-color', isDarkMode ? '#F4F4F0' : '#1A1A1A');
   }, [isDarkMode]);
 
-  // Reseta os sub-filtros territoriais sempre que a Base mudar
   useEffect(() => {
     setFilterDistrito('Todos');
     setFilterRegiao('Todas');
     setFilterMunicipioBairro('Todas');
-    
-    // Auto-Ajusta o Mapa
     if (filterBase === 'Base Florianópolis') setMapScope('FLN');
     else if (filterBase === 'Base Santa Catarina') setMapScope('SC');
   }, [filterBase]);
@@ -160,7 +142,6 @@ export default function App() {
   const situacoesExtraidas = ['Todas', ...new Set(contacts.map(c => c.situacao).filter(Boolean))].sort();
   const articuladoresExtraidos = ['Todos', ...new Set(contacts.map(c => c.articulador).filter(Boolean))].sort();
   
-  // Condicionais baseados nos contatos totais da base específica
   const distritosExtraidos = ['Todos', ...new Set(contacts.filter(c => c.base === 'Base Florianópolis').map(c => c.distrito).filter(Boolean))].sort();
   const bairrosExtraidos = ['Todas', ...new Set(contacts.filter(c => c.base === 'Base Florianópolis').map(c => c.municipio_bairro).filter(Boolean))].sort();
   const regioesExtraidas = ['Todas', ...new Set(contacts.filter(c => c.base === 'Base Santa Catarina').map(c => c.regiao).filter(Boolean))].sort();
@@ -172,9 +153,7 @@ export default function App() {
     try {
       const res = await fetch(localSyncUrl);
       const data = await res.json();
-      if (Array.isArray(data)) {
-        setContacts(data);
-      }
+      if (Array.isArray(data)) setContacts(data);
     } catch (e) {
       console.error("Erro ao sincronizar:", e);
     } finally {
@@ -269,7 +248,6 @@ export default function App() {
       const matchesRegiao = filterRegiao === 'Todas' || contact.regiao === filterRegiao;
       const matchesDistrito = filterDistrito === 'Todos' || contact.distrito === filterDistrito;
       const matchesMunBairro = filterMunicipioBairro === 'Todas' || contact.municipio_bairro === filterMunicipioBairro;
-      
       return matchesBase && matchesArticulador && matchesRegiao && matchesDistrito && matchesMunBairro;
     });
   }, [contacts, filterBase, filterArticulador, filterRegiao, filterDistrito, filterMunicipioBairro]);
@@ -282,10 +260,8 @@ export default function App() {
       const localMatch = contact.municipio_bairro?.toLowerCase().includes(searchTerm.toLowerCase());
       const areaMatch = contact.area_de_atuacao?.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesSearch = nomeMatch || localMatch || areaMatch;
-      
       const matchesTemas = filterTemas === 'Todos' || contact.temas === filterTemas;
       const matchesSituacao = filterSituacao === 'Todas' || contact.situacao === filterSituacao;
-      
       return matchesSearch && matchesTemas && matchesSituacao;
     });
   }, [activeContacts, searchTerm, filterTemas, filterSituacao]);
@@ -293,15 +269,11 @@ export default function App() {
   const stats = useMemo(() => {
     const floripaCount = dashboardContacts.filter(c => c.base === 'Base Florianópolis').length;
     const scCount = dashboardContacts.filter(c => c.base === 'Base Santa Catarina').length;
-    
-    // Temas
     const temaCounts = dashboardContacts.reduce((acc, curr) => {
       if(curr.temas) acc[curr.temas] = (acc[curr.temas] || 0) + 1;
       return acc;
     }, {});
     const topTemas = Object.entries(temaCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
-
-    // Situação
     const situacaoCounts = dashboardContacts.reduce((acc, curr) => {
       if(curr.situacao) acc[curr.situacao] = (acc[curr.situacao] || 0) + 1;
       return acc;
@@ -314,11 +286,7 @@ export default function App() {
   const SelectFilter = ({ label, value, onChange, options, isDark = false }) => (
     <div className="w-full sm:flex-1 min-w-[140px] flex flex-col gap-1.5">
       <label className={`font-bold text-xs md:text-sm uppercase tracking-wide ${isDark ? 'text-[#1A1A1A]' : t.textMuted}`}>{label}</label>
-      <select 
-        value={value} 
-        onChange={onChange} 
-        className={`w-full px-3 py-2.5 rounded-lg border-[3px] ${t.border} font-medium ${t.inputBg} ${t.text} truncate focus:outline-none focus:ring-2 focus:ring-[#B32033] shadow-sm`}
-      >
+      <select value={value} onChange={onChange} className={`w-full px-3 py-2.5 rounded-lg border-[3px] ${t.border} font-medium ${t.inputBg} ${t.text} truncate focus:outline-none focus:ring-2 focus:ring-[#B32033] shadow-sm`}>
         {options.map(o => <option key={o} value={o}>{o}</option>)}
       </select>
     </div>
@@ -334,60 +302,190 @@ export default function App() {
   };
 
   const renderHeatMap = () => {
-    const heatPoints = {};
+    // 1. Agrupar dados para SC (Por Município)
+    const contatosPorMuni = {};
     dashboardContacts.forEach(c => {
-      if (mapScope === 'FLN' && c.base !== 'Base Florianópolis') return;
-      if (mapScope === 'SC' && c.base !== 'Base Santa Catarina') return; 
-      const locName = c.municipio_bairro;
-      const coords = MAP_COORDINATES[mapScope][locName];
-      if (coords) {
-        if (!heatPoints[locName]) heatPoints[locName] = { ...coords, count: 0, label: locName };
-        heatPoints[locName].count += 1;
+      if (c.base === 'Base Santa Catarina') {
+        const mName = normalizeStr(c.municipio_bairro);
+        if (mName) contatosPorMuni[mName] = (contatosPorMuni[mName] || 0) + 1;
       }
     });
 
-    const maxCount = Math.max(1, ...Object.values(heatPoints).map(p => p.count));
+    // 2. Agrupar dados para Floripa (Por Bairro/Distrito)
+    const contatosPorBairro = {};
+    dashboardContacts.forEach(c => {
+      if (c.base === 'Base Florianópolis') {
+        const bName = c.municipio_bairro;
+        if (bName) contatosPorBairro[bName] = (contatosPorBairro[bName] || 0) + 1;
+      }
+    });
+
+    const getMuniColor = (val, dark) => {
+      if (!val || val === 0) return dark ? '#2A2A2A' : '#EAEAEA'; 
+      if (val < 2) return '#DCAE1D'; // Low
+      if (val < 5) return '#007577'; // Medium
+      return '#B32033'; // High
+    };
+
+    const renderRealMapSVG = () => {
+      if (!mapGeoJson) return <div className="absolute inset-0 flex items-center justify-center font-bold text-gray-500 uppercase tracking-widest">Carregando Mapa...</div>;
+
+      let featuresToRender = mapGeoJson.features;
+      
+      // Filtro de zoom para Floripa
+      if (mapScope === 'FLN') {
+        const targetMunis = ['Florianópolis', 'São José', 'Palhoça', 'Biguaçu'];
+        featuresToRender = mapGeoJson.features.filter(f => targetMunis.includes(f.properties.name));
+      }
+
+      // Descobrir limites para desenhar os paths
+      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+      featuresToRender.forEach(f => {
+        const processRings = (rings) => {
+          rings.forEach(ring => ring.forEach(coord => {
+            if (coord[0] < minX) minX = coord[0];
+            if (coord[0] > maxX) maxX = coord[0];
+            if (coord[1] < minY) minY = coord[1];
+            if (coord[1] > maxY) maxY = coord[1];
+          }));
+        };
+        if (f.geometry.type === 'Polygon') processRings(f.geometry.coordinates);
+        else if (f.geometry.type === 'MultiPolygon') f.geometry.coordinates.forEach(processRings);
+      });
+
+      const mapWidth = 800; const mapHeight = 600;
+      const scaleX = mapWidth / (maxX - minX);
+      const scaleY = mapHeight / (maxY - minY);
+      const scale = Math.min(scaleX, scaleY) * 0.95; // 5% margin padding
+      
+      const offsetX = (mapWidth - (maxX - minX) * scale) / 2;
+      const offsetY = (mapHeight - (maxY - minY) * scale) / 2;
+
+      const project = (coord) => {
+        const x = (coord[0] - minX) * scale + offsetX;
+        const y = mapHeight - ((coord[1] - minY) * scale) - offsetY;
+        return { x, y, str: `${x},${y}` };
+      };
+
+      const generatePath = (geometry) => {
+        const createString = (rings) => rings.map(ring => "M" + ring.map(coord => project(coord).str).join("L") + "Z").join(" ");
+        if (geometry.type === 'Polygon') return createString(geometry.coordinates);
+        if (geometry.type === 'MultiPolygon') return geometry.coordinates.map(createString).join(" ");
+        return "";
+      };
+
+      return (
+        <div className="relative w-full h-full flex items-center justify-center p-4">
+          <svg viewBox={`0 0 ${mapWidth} ${mapHeight}`} className="w-full h-auto max-h-[450px] drop-shadow-md">
+            {featuresToRender.map((feature, i) => {
+              const mName = normalizeStr(feature.properties.name);
+              const val = contatosPorMuni[mName] || 0;
+              const isFloripa = feature.properties.name === 'Florianópolis';
+              
+              let fillCol = getMuniColor(val, isDarkMode);
+              // Quando olhamos pra Floripa, a base do polígono fica neutra para destacar as bolhas
+              if (mapScope === 'FLN') {
+                 fillCol = isFloripa ? (isDarkMode ? '#1E1E1E' : '#FFFFFF') : (isDarkMode ? '#121212' : '#F0F0F0');
+              }
+
+              return (
+                <path 
+                  key={i} d={generatePath(feature.geometry)}
+                  fill={fillCol} 
+                  stroke={isDarkMode ? "#555" : "#1A1A1A"} 
+                  strokeWidth={mapScope === 'FLN' ? "2" : "1"}
+                  className={`transition-all ${mapScope === 'SC' ? 'hover:stroke-[3px] hover:fill-[#DCAE1D] cursor-crosshair' : ''}`}
+                  onMouseEnter={(e) => {
+                    if (mapScope === 'SC') setHoveredMapItem({ name: feature.properties.name, val, x: e.clientX, y: e.clientY });
+                  }}
+                  onMouseLeave={() => setHoveredMapItem(null)}
+                />
+              );
+            })}
+
+            {/* Renderizar as bolhas (bubbles) do FLN por cima da Ilha */}
+            {mapScope === 'FLN' && Object.entries(contatosPorBairro).map(([bairro, count], i) => {
+                const flnFeature = mapGeoJson.features.find(f => f.properties.name === 'Florianópolis');
+                if(!flnFeature) return null;
+
+                let fMinX = Infinity, fMaxX = -Infinity, fMinY = Infinity, fMaxY = -Infinity;
+                const processRings = (rings) => {
+                  rings.forEach(ring => ring.forEach(coord => {
+                    if (coord[0] < fMinX) fMinX = coord[0];
+                    if (coord[0] > fMaxX) fMaxX = coord[0];
+                    if (coord[1] < fMinY) fMinY = coord[1];
+                    if (coord[1] > fMaxY) fMaxY = coord[1];
+                  }));
+                };
+                if (flnFeature.geometry.type === 'Polygon') processRings(flnFeature.geometry.coordinates);
+                else if (flnFeature.geometry.type === 'MultiPolygon') flnFeature.geometry.coordinates.forEach(processRings);
+
+                const coords = MAP_COORDINATES.FLN[bairro];
+                if (!coords) return null;
+
+                // Mapear os percentuais abstratos (0-100) originais para a Bounding Box real de Floripa
+                const targetLon = fMinX + (coords.x / 100) * (fMaxX - fMinX);
+                const targetLat = fMaxY - (coords.y / 100) * (fMaxY - fMinY);
+                
+                const proj = project([targetLon, targetLat]);
+
+                const maxCount = Math.max(1, ...Object.values(contatosPorBairro));
+                const intensity = count / maxCount;
+                const size = 12 + (intensity * 25); 
+                const color = '#B32033'; // Rose vibrante sobre o mapa
+
+                return (
+                  <g key={`bubble-${i}`} className="cursor-crosshair group"
+                     onMouseEnter={(e) => setHoveredMapItem({ name: bairro, val: count, x: e.clientX, y: e.clientY })}
+                     onMouseLeave={() => setHoveredMapItem(null)}
+                  >
+                    <circle cx={proj.x} cy={proj.y} r={size} fill={color} opacity="0.4" className="animate-pulse" />
+                    <circle cx={proj.x} cy={proj.y} r={size * 0.6} fill={color} stroke={isDarkMode ? "#1A1A1A" : "#F4F4F0"} strokeWidth="2" className="group-hover:stroke-4 transition-all" />
+                  </g>
+                );
+            })}
+          </svg>
+        </div>
+      );
+    };
 
     return (
-      <div className={`${baseCard} bg-[#1A1A1A] p-4 md:p-6 flex flex-col lg:col-span-3 text-[#F4F4F0] overflow-hidden`}>
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-          <h3 className="text-xl md:text-2xl font-bold flex items-center gap-2 w-full md:w-auto">
+      <div className={`${baseCard} ${t.cardBg} p-4 md:p-6 flex flex-col lg:col-span-3 overflow-hidden relative`}>
+        <div className={`flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 border-b-[3px] ${t.border} pb-4`}>
+          <h3 className={`text-xl md:text-2xl font-bold flex items-center gap-2 w-full md:w-auto ${t.text}`}>
             <Icon name="map" size={28} className="text-[#DCAE1D] shrink-0" /> 
-            <span className="truncate">Densidade: {mapScope === 'SC' ? 'Santa Catarina' : 'Floripa'}</span>
+            <span className="truncate">Mapa de {mapScope === 'SC' ? 'Santa Catarina' : 'Florianópolis'}</span>
           </h3>
-          <div className="flex border-[3px] border-[#F4F4F0] rounded-lg overflow-hidden shrink-0 w-full md:w-auto">
-            <button onClick={() => setMapScope('SC')} className={`flex-1 px-4 py-2 font-bold transition-colors ${mapScope === 'SC' ? 'bg-[#DCAE1D] text-[#1A1A1A]' : 'bg-transparent text-[#F4F4F0] hover:bg-gray-800'}`}>SC</button>
-            <div className="w-[3px] bg-[#F4F4F0]"></div>
-            <button onClick={() => setMapScope('FLN')} className={`flex-1 px-4 py-2 font-bold transition-colors ${mapScope === 'FLN' ? 'bg-[#007577] text-white' : 'bg-transparent text-[#F4F4F0] hover:bg-gray-800'}`}>Floripa</button>
+          
+          <div className="flex items-center gap-4 text-xs font-bold uppercase tracking-wider w-full md:w-auto">
+            {mapScope === 'SC' && (
+              <div className={`hidden md:flex space-x-2 items-center ${t.textMuted}`}>
+                <span>Legenda:</span>
+                <div className={`w-3 h-3 bg-[#DCAE1D] border border-[${t.border}]`}></div> <span>Baixo</span>
+                <div className={`w-3 h-3 bg-[#007577] border border-[${t.border}]`}></div> <span>Médio</span>
+                <div className={`w-3 h-3 bg-[#B32033] border border-[${t.border}]`}></div> <span>Alto</span>
+              </div>
+            )}
+            
+            <div className={`flex border-[3px] ${t.border} rounded-lg overflow-hidden shrink-0 w-full md:w-auto ml-auto`}>
+              <button onClick={() => setMapScope('SC')} className={`flex-1 px-4 py-2 font-bold transition-colors ${mapScope === 'SC' ? 'bg-[#DCAE1D] text-[#1A1A1A]' : `bg-transparent hover:bg-gray-500/20 ${t.text}`}`}>SC</button>
+              <div className={`w-[3px] ${t.border}`}></div>
+              <button onClick={() => setMapScope('FLN')} className={`flex-1 px-4 py-2 font-bold transition-colors ${mapScope === 'FLN' ? 'bg-[#007577] text-white' : `bg-transparent hover:bg-gray-500/20 ${t.text}`}`}>Floripa</button>
+            </div>
           </div>
         </div>
-        <div className={`relative w-full ${mapScope === 'SC' ? 'aspect-video max-h-[500px]' : 'aspect-[3/4] max-h-[500px] max-w-[400px] mx-auto'} bg-[#2A2A2A] rounded-lg border-2 border-gray-700 overflow-hidden`}>
-          <svg className="absolute inset-0 w-full h-full opacity-30 pointer-events-none" preserveAspectRatio="none" viewBox="0 0 100 100">
-            {mapScope === 'SC' ? (
-              <polygon points="5,45 35,30 65,20 85,10 95,40 98,55 90,85 75,95 55,75 25,65 5,60" fill="#007577" stroke="#F4F4F0" strokeWidth="1" strokeLinejoin="round" />
-            ) : (
-              <>
-                <polygon points="5,35 35,35 40,55 25,65 5,65" fill="#DCAE1D" stroke="#F4F4F0" strokeWidth="1" strokeLinejoin="round" />
-                <polygon points="45,15 65,10 75,40 85,70 70,95 55,85 50,60 40,40" fill="#007577" stroke="#F4F4F0" strokeWidth="1" strokeLinejoin="round" />
-              </>
-            )}
-          </svg>
-          {Object.values(heatPoints).map((pt, i) => {
-            const intensity = pt.count / maxCount;
-            const size = 16 + (intensity * 40); 
-            const opacity = 0.5 + (intensity * 0.5);
-            const color = mapScope === 'FLN' ? '#DCAE1D' : '#B32033';
-            return (
-              <div key={i} className="absolute flex items-center justify-center transform -translate-x-1/2 -translate-y-1/2 group cursor-crosshair" style={{ top: `${pt.y}%`, left: `${pt.x}%`, width: size, height: size }}>
-                <div className="absolute inset-0 rounded-full animate-pulse" style={{ backgroundColor: color, opacity: opacity * 0.5 }}></div>
-                <div className="absolute inset-2 rounded-full border-2 border-white shadow-[0_0_10px_rgba(0,0,0,0.5)]" style={{ backgroundColor: color, opacity: opacity }}></div>
-                <div className="absolute top-full mt-2 w-max max-w-[150px] bg-[#F4F4F0] text-[#1A1A1A] text-xs font-bold px-2 py-1 rounded border-2 border-[#1A1A1A] opacity-0 group-hover:opacity-100 transition-opacity z-10 shadow-md">
-                  {pt.label}: {pt.count} contatos
-                </div>
-              </div>
-            );
-          })}
+        
+        <div className={`relative w-full ${t.inputBgAlt} rounded-lg border-[3px] ${t.border} overflow-hidden min-h-[400px]`}>
+          {renderRealMapSVG()}
         </div>
+
+        {hoveredMapItem && (
+          <div className="fixed bg-white border-[3px] border-[#1A1A1A] p-3 shadow-mondrian z-50 pointer-events-none transform -translate-x-1/2 -translate-y-full mt-[-15px] text-[#1A1A1A]"
+               style={{ left: hoveredMapItem.x, top: hoveredMapItem.y }}>
+            <p className="font-black text-[#B32033] uppercase">{hoveredMapItem.name}</p>
+            <p className="font-bold text-sm">{hoveredMapItem.val > 0 ? `${hoveredMapItem.val} Contato(s)` : 'Sem contatos'}</p>
+          </div>
+        )}
       </div>
     );
   };
@@ -509,7 +607,6 @@ export default function App() {
       <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4">
         <h2 className={`text-xl md:text-2xl font-black flex items-center gap-2 ${t.text}`}><Icon name="directory"/> Diretório Base</h2>
         
-        {/* Toggle Grid/List e Adicionar */}
         <div className="flex gap-2 sm:gap-4 flex-col sm:flex-row w-full sm:w-auto">
           <div className={`flex border-[3px] ${t.border} rounded-xl overflow-hidden shadow-mondrian-btn ${t.inputBgAlt} w-full sm:w-auto`}>
             <button 
@@ -574,7 +671,6 @@ export default function App() {
         </div>
       ) : (
         <>
-          {/* MODO GRADE (CARDS) */}
           {directoryViewMode === 'grid' && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredContacts.map(contact => (
@@ -599,13 +695,11 @@ export default function App() {
             </div>
           )}
 
-          {/* MODO LISTA (LINHAS) */}
           {directoryViewMode === 'list' && (
             <div className="flex flex-col gap-3">
               {filteredContacts.map(contact => (
                 <div key={contact.id} onClick={() => { setSelectedContact(contact); setIsEditMode(false); }} className={`${mondrianCard} relative overflow-hidden hover:-translate-y-1 hover:shadow-mondrian-btn cursor-pointer p-4 md:p-0 flex flex-col md:flex-row md:items-center gap-3 md:gap-0`}>
                   
-                  {/* Barra de Cor (Topo no Celular, Lateral no Desktop) */}
                   <div className={`h-2 w-full md:w-3 md:h-full absolute left-0 top-0 md:bottom-0 ${contact.base.includes('Florianópolis') ? 'bg-[#007577]' : 'bg-[#DCAE1D]'}`}></div>
 
                   <div className="md:pl-6 md:pr-4 md:py-4 flex-1 mt-2 md:mt-0">
