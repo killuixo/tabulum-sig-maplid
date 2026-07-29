@@ -76,7 +76,7 @@ export default function App() {
   const [formData, setFormData] = useState({});
   const [dialog, setDialog] = useState(null); 
   
-  const [isDarkMode] = useState(false); // Retirado a alternância para manter o padrão
+  const [isDarkMode] = useState(false);
   const [mapScope, setMapScope] = useState('SC');
   const [directoryViewMode, setDirectoryViewMode] = useState('grid');
   
@@ -92,8 +92,8 @@ export default function App() {
   const [filterMunicipioSc, setFilterMunicipioSc] = useState([]);
 
   const [isLoading, setIsLoading] = useState(false);
+  const [temaSort, setTemaSort] = useState({ column: 'count', direction: 'desc' });
 
-  // Mapa Real
   const [mapGeoJson, setMapGeoJson] = useState(null);
   const [hoveredMapItem, setHoveredMapItem] = useState(null);
 
@@ -113,7 +113,6 @@ export default function App() {
     document.documentElement.style.setProperty('--border-color', isDarkMode ? '#F4F4F0' : '#1A1A1A');
   }, [isDarkMode]);
 
-  // Auto-Ajusta o escopo do Mapa baseado na Base selecionada
   useEffect(() => {
     if (filterBase.includes('Base Florianópolis') && !filterBase.includes('Base Santa Catarina')) {
       setMapScope('FLN');
@@ -235,7 +234,6 @@ export default function App() {
 
   const filteredContacts = useMemo(() => {
     return contacts.filter(contact => {
-      // Arrays vazios significam "Todos selecionados"
       const matchesBase = filterBase.length === 0 || filterBase.includes(contact.base);
       const matchesArticulador = filterArticulador.length === 0 || filterArticulador.includes(contact.articulador);
       const matchesTemas = filterTemas.length === 0 || filterTemas.includes(contact.temas);
@@ -246,7 +244,6 @@ export default function App() {
       const areaMatch = contact.area_de_atuacao?.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesSearch = !searchTerm || nomeMatch || localMatch || areaMatch;
 
-      // Filtros Condicionais Territoriais
       const isFln = contact.base === 'Base Florianópolis';
       const isSc = contact.base === 'Base Santa Catarina';
       
@@ -270,7 +267,6 @@ export default function App() {
       if(curr.temas) acc[curr.temas] = (acc[curr.temas] || 0) + 1;
       return acc;
     }, {});
-    const topTemas = Object.entries(temaCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
 
     const situacaoCounts = filteredContacts.reduce((acc, curr) => {
       if(curr.situacao) acc[curr.situacao] = (acc[curr.situacao] || 0) + 1;
@@ -278,7 +274,7 @@ export default function App() {
     }, {});
     const topSituacoes = Object.entries(situacaoCounts).sort((a, b) => a[0].localeCompare(b[0]));
 
-    return { total: filteredContacts.length, floripaCount, scCount, topTemas, topSituacoes };
+    return { total: filteredContacts.length, floripaCount, scCount, temaCounts, topSituacoes };
   }, [filteredContacts]);
 
   const contatosPorMuni = useMemo(() => {
@@ -300,6 +296,14 @@ export default function App() {
     });
     return map;
   }, [filteredContacts]);
+
+  const handleSortTemas = (column) => {
+    if (temaSort.column === column) {
+      setTemaSort({ column, direction: temaSort.direction === 'asc' ? 'desc' : 'asc' });
+    } else {
+      setTemaSort({ column, direction: column === 'count' ? 'desc' : 'asc' });
+    }
+  };
 
   const MultiSelectFilter = ({ label, options, selected, onChange }) => {
     const [isOpen, setIsOpen] = useState(false);
@@ -361,6 +365,7 @@ export default function App() {
     if (situacao.includes("4 -")) cor = "bg-[#007577] text-white";
     else if (situacao.includes("3 -")) cor = "bg-[#DCAE1D] text-[#1A1A1A]";
     else if (situacao.includes("1 -") || situacao.includes("2 -")) cor = "bg-[#B32033] text-white";
+    else if (situacao.includes("2 -")) cor = "bg-[#F4A261] text-white"; 
     return <span className={`px-2 py-1 text-[10px] md:text-xs font-bold rounded-md border-[2px] ${t.border} ${cor} truncate max-w-full block`}>{situacao}</span>;
   };
 
@@ -560,91 +565,136 @@ export default function App() {
     );
   };
 
-  const renderDashboard = () => (
-    <div className="space-y-6 animation-fade-in">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        <div className={`${mondrianCard} p-6 flex flex-col justify-between overflow-hidden relative sm:col-span-2 lg:col-span-1`}>
-          <div className={`absolute top-0 right-0 w-16 h-16 bg-[#B32033] border-l-[3px] border-b-[3px] ${t.border} rounded-bl-xl`}></div>
-          <h3 className={`text-xl font-bold mb-2 relative z-10 ${t.text}`}>Total Filtrado</h3>
-          <p className={`text-6xl font-black relative z-10 ${t.text}`}>{stats.total}</p>
-        </div>
-        <div className={`${baseCard} bg-[#007577] text-white p-6 flex flex-col justify-between`}>
-          <h3 className="text-xl font-bold mb-2 flex items-center gap-2"><Icon name="mappin" /> Florianópolis</h3>
-          <p className="text-5xl font-black">{stats.floripaCount}</p>
-        </div>
-        <div className={`${baseCard} bg-[#DCAE1D] text-[#1A1A1A] p-6 flex flex-col justify-between`}>
-          <h3 className="text-xl font-bold mb-2 flex items-center gap-2"><Icon name="mappin" /> Santa Catarina</h3>
-          <p className="text-5xl font-black">{stats.scCount}</p>
-        </div>
-        
-        {renderRealMapSVG()}
-        
-        <div className="col-span-1 sm:col-span-2 lg:col-span-3 grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className={`${mondrianCard} p-6 flex flex-col`}>
-            <h3 className={`text-xl md:text-2xl font-bold mb-6 border-b-[3px] ${t.border} pb-2 flex items-center gap-2 ${t.text}`}>
-              <Icon name="barchart" /> Principais Temas
-            </h3>
-            {stats.topTemas.length > 0 ? (
-              <div className="space-y-4">
-                {stats.topTemas.map(([nome, count], index) => {
-                  const max = Math.max(...stats.topTemas.map(t => t[1]));
-                  const percentage = (count / max) * 100;
-                  const colors = ['bg-[#B32033]', 'bg-[#007577]', 'bg-[#DCAE1D]', isDarkMode ? 'bg-gray-400' : 'bg-[#1A1A1A]'];
-                  return (
-                    <div key={nome}>
-                      <div className={`flex justify-between text-sm font-bold mb-1 ${t.text}`}>
-                        <span className="truncate pr-4">{nome}</span>
-                        <span className="shrink-0">{count} conts.</span>
-                      </div>
-                      <div className={`h-4 w-full ${t.inputBgAlt} rounded-full border-[2px] ${t.border} overflow-hidden`}>
-                        <div className={`h-full ${colors[index % colors.length]} transition-all duration-1000 border-r-[2px] ${t.border}`} style={{ width: `${percentage}%` }}></div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <p className={`font-medium ${t.textMuted} mt-auto`}>Não há temas associados a este filtro.</p>
-            )}
-          </div>
+  const renderDashboard = () => {
+    // Lógica Temas: Separar "OUTROS TEMAS" da lista e permitir ordenação
+    const temaEntries = Object.entries(stats.temaCounts || {});
+    const displayTemas = temaEntries.filter(([nome]) => nome.toUpperCase() !== 'OUTROS TEMAS' && nome.trim() !== '');
+    const outrosTemasCount = temaEntries.find(([nome]) => nome.toUpperCase() === 'OUTROS TEMAS')?.[1] || 0;
 
-          <div className={`${mondrianCard} p-6 flex flex-col`}>
-            <h3 className={`text-xl md:text-2xl font-bold mb-6 border-b-[3px] ${t.border} pb-2 flex items-center gap-2 ${t.text}`}>
-              <Icon name="check" /> Status de Alinhamento
-            </h3>
-            {stats.topSituacoes.length > 0 ? (
-              <div className="space-y-4">
-                {stats.topSituacoes.map(([nome, count]) => {
-                  const max = Math.max(...stats.topSituacoes.map(t => t[1]));
-                  const percentage = (count / max) * 100;
+    displayTemas.sort((a, b) => {
+      if (temaSort.column === 'nome') {
+        return temaSort.direction === 'asc' ? a[0].localeCompare(b[0]) : b[0].localeCompare(a[0]);
+      } else {
+        return temaSort.direction === 'asc' ? a[1] - b[1] : b[1] - a[1];
+      }
+    });
+
+    // Lógica Gráfico de Pizza (Situação)
+    const totalSituacoes = stats.topSituacoes.reduce((sum, item) => sum + item[1], 0);
+    let cumulative = 0;
+    const pieSlices = stats.topSituacoes.map(([nome, count]) => {
+      const percent = (count / totalSituacoes) * 100;
+      let color = '#888888';
+      if (nome.includes('1 -')) color = '#B32033'; 
+      else if (nome.includes('2 -')) color = '#F4A261'; 
+      else if (nome.includes('3 -')) color = '#DCAE1D'; 
+      else if (nome.includes('4 -')) color = '#007577'; 
+      const slice = `${color} ${cumulative}% ${cumulative + percent}%`;
+      cumulative += percent;
+      return slice;
+    }).join(', ');
+    const conicGradient = `conic-gradient(${pieSlices})`;
+
+    return (
+      <div className="space-y-6 animation-fade-in">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className={`${mondrianCard} p-6 flex flex-col justify-between overflow-hidden relative sm:col-span-2 lg:col-span-1`}>
+            <div className={`absolute top-0 right-0 w-16 h-16 bg-[#B32033] border-l-[3px] border-b-[3px] ${t.border} rounded-bl-xl`}></div>
+            <h3 className={`text-xl font-bold mb-2 relative z-10 ${t.text}`}>Total Filtrado</h3>
+            <p className={`text-6xl font-black relative z-10 ${t.text}`}>{stats.total}</p>
+          </div>
+          <div className={`${baseCard} bg-[#007577] text-white p-6 flex flex-col justify-between`}>
+            <h3 className="text-xl font-bold mb-2 flex items-center gap-2"><Icon name="mappin" /> Florianópolis</h3>
+            <p className="text-5xl font-black">{stats.floripaCount}</p>
+          </div>
+          <div className={`${baseCard} bg-[#DCAE1D] text-[#1A1A1A] p-6 flex flex-col justify-between`}>
+            <h3 className="text-xl font-bold mb-2 flex items-center gap-2"><Icon name="mappin" /> Santa Catarina</h3>
+            <p className="text-5xl font-black">{stats.scCount}</p>
+          </div>
+          
+          {renderRealMapSVG()}
+          
+          <div className="col-span-1 sm:col-span-2 lg:col-span-3 grid grid-cols-1 lg:grid-cols-2 gap-6">
+            
+            <div className={`${mondrianCard} p-6 flex flex-col h-[450px] md:h-[500px]`}>
+              <h3 className={`text-xl md:text-2xl font-bold mb-4 border-b-[3px] ${t.border} pb-2 flex items-center gap-2 ${t.text} shrink-0`}>
+                <Icon name="barchart" /> Lista de Temas
+              </h3>
+              
+              {displayTemas.length > 0 ? (
+                <>
+                  <div className={`flex justify-between text-[10px] md:text-xs font-black uppercase tracking-wider text-gray-500 mb-2 px-2 border-b-2 border-dashed ${t.border} pb-2 shrink-0`}>
+                    <div className="cursor-pointer hover:text-[#B32033] flex items-center gap-1 transition-colors" onClick={() => handleSortTemas('nome')}>
+                      TEMA {temaSort.column === 'nome' && (temaSort.direction === 'asc' ? '▲' : '▼')}
+                    </div>
+                    <div className="cursor-pointer hover:text-[#B32033] flex items-center gap-1 text-right transition-colors" onClick={() => handleSortTemas('count')}>
+                      QTD {temaSort.column === 'count' && (temaSort.direction === 'asc' ? '▲' : '▼')}
+                    </div>
+                  </div>
                   
-                  let colorClass = isDarkMode ? 'bg-gray-400' : 'bg-gray-700';
-                  if (nome.includes('4 -')) colorClass = 'bg-[#007577]';
-                  else if (nome.includes('3 -')) colorClass = 'bg-[#DCAE1D]';
-                  else if (nome.includes('1 -') || nome.includes('2 -')) colorClass = 'bg-[#B32033]';
-
-                  return (
-                    <div key={nome}>
-                      <div className={`flex justify-between text-sm font-bold mb-1 ${t.text}`}>
-                        <span className="truncate pr-4">{nome}</span>
-                        <span className="shrink-0">{count} conts.</span>
+                  <div className="overflow-y-auto pr-2 space-y-1 flex-1 custom-scrollbar">
+                    {displayTemas.map(([nome, count]) => (
+                      <div key={nome} className={`flex justify-between items-center text-xs md:text-sm font-bold p-2 hover:${t.inputBgAlt} rounded-md transition-colors ${t.text}`}>
+                        <span className="truncate pr-4 leading-tight">{nome}</span>
+                        <span className="shrink-0 bg-[#007577] text-white px-2.5 py-1 rounded-md text-[10px] md:text-xs border-[2px] border-[#1A1A1A]">{count}</span>
                       </div>
-                      <div className={`h-4 w-full ${t.inputBgAlt} rounded-full border-[2px] ${t.border} overflow-hidden`}>
-                        <div className={`h-full ${colorClass} transition-all duration-1000 border-r-[2px] ${t.border}`} style={{ width: `${percentage}%` }}></div>
-                      </div>
+                    ))}
+                  </div>
+                  
+                  {outrosTemasCount > 0 && (
+                    <div className="mt-3 pt-3 border-t-[3px] border-dashed border-gray-300 dark:border-gray-700 text-xs md:text-sm font-bold text-gray-500 text-center flex justify-center items-center gap-2 shrink-0">
+                      <Icon name="tag" size={14} /> Outros Temas: {outrosTemasCount} entrada(s) separadas
                     </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <p className={`font-medium ${t.textMuted} mt-auto`}>Sem dados de situação para exibir.</p>
-            )}
+                  )}
+                </>
+              ) : (
+                <p className={`font-medium ${t.textMuted} mt-auto mb-auto text-center`}>Não há temas associados a este filtro.</p>
+              )}
+            </div>
+
+            <div className={`${mondrianCard} p-6 flex flex-col h-[450px] md:h-[500px]`}>
+              <h3 className={`text-xl md:text-2xl font-bold mb-6 border-b-[3px] ${t.border} pb-2 flex items-center gap-2 ${t.text} shrink-0`}>
+                <Icon name="check" /> Status de Alinhamento
+              </h3>
+              
+              {totalSituacoes > 0 ? (
+                <div className="flex flex-col sm:flex-row items-center gap-6 md:gap-10 mt-auto mb-auto overflow-y-auto custom-scrollbar pr-2">
+                  <div 
+                    className="w-40 h-40 md:w-52 md:h-52 rounded-full border-[4px] border-[#1A1A1A] shadow-mondrian shrink-0" 
+                    style={{ background: conicGradient }}
+                  ></div>
+                  <div className="flex flex-col gap-3 w-full justify-center">
+                    {stats.topSituacoes.map(([nome, count]) => {
+                      let colorClass = 'bg-gray-500';
+                      if (nome.includes('1 -')) colorClass = 'bg-[#B32033]';
+                      else if (nome.includes('2 -')) colorClass = 'bg-[#F4A261]';
+                      else if (nome.includes('3 -')) colorClass = 'bg-[#DCAE1D]';
+                      else if (nome.includes('4 -')) colorClass = 'bg-[#007577]';
+
+                      const percent = ((count / totalSituacoes) * 100).toFixed(1);
+
+                      return (
+                        <div key={nome} className={`flex items-center justify-between text-xs md:text-sm font-bold p-2 rounded-md border-[2px] ${t.border} bg-white dark:bg-[#2A2A2A] shadow-sm`}>
+                          <div className="flex items-center gap-2 truncate pr-2">
+                            <span className={`w-4 h-4 rounded-sm border-[2px] border-[#1A1A1A] shrink-0 ${colorClass}`}></span>
+                            <span className={`truncate ${t.text}`}>{nome}</span>
+                          </div>
+                          <span className={`shrink-0 ${t.textMuted}`}>{percent}% ({count})</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <p className={`font-medium ${t.textMuted} mt-auto mb-auto text-center`}>Sem dados de situação para exibir.</p>
+              )}
+            </div>
+            
           </div>
         </div>
-
       </div>
-    </div>
-  );
+    );
+  };
 
   const renderDirectory = () => (
     <div className="space-y-6 animation-fade-in">
@@ -687,7 +737,6 @@ export default function App() {
                       </div>
                       <SituacaoBadge situacao={contact.situacao} />
                     </div>
-                    {/* Articuladores inseridos aqui abaixo dos temas */}
                     <div className={`mt-auto pt-4 border-t-2 border-dashed ${isDarkMode ? 'border-gray-700' : 'border-gray-300'} flex flex-wrap gap-2 items-center justify-between`}>
                       <div className="flex flex-col gap-1.5 max-w-[70%]">
                         <span className={`text-[10px] md:text-xs font-bold truncate ${t.textMuted}`}><Icon name="tag" size={12} className="inline mr-1"/>{contact.temas || 'S/ Tema'}</span>
@@ -722,17 +771,15 @@ export default function App() {
                   <div className="md:px-4 md:py-4 md:w-48 shrink-0 flex items-center">
                     <SituacaoBadge situacao={contact.situacao} />
                   </div>
-                  <div className="md:px-4 md:py-4 md:w-40 shrink-0 hidden md:block border-l-2 border-dashed border-gray-300 dark:border-gray-700">
-                     {contact.articulador && (
-                       <>
-                         <span className={`text-[10px] md:text-xs font-bold truncate block ${t.textMuted}`}>Articulador</span>
-                         <span className={`text-xs font-bold truncate flex items-center gap-1 text-[#1A1A1A] dark:text-[#F4F4F0]`}>
-                            <Icon name="usercheck" size={14} className="text-[#007577]" /> {contact.articulador}
-                         </span>
-                       </>
-                     )}
-                  </div>
-                  <div className="md:px-4 md:py-4 shrink-0 hidden md:flex items-center justify-center">
+                  {contact.articulador && (
+                    <div className="md:px-4 md:py-4 md:w-40 shrink-0 hidden md:block border-l-2 border-dashed border-gray-300 dark:border-gray-700">
+                       <span className={`text-[10px] md:text-xs font-bold truncate block ${t.textMuted}`}>Articulador</span>
+                       <span className={`text-xs font-bold truncate flex items-center gap-1 text-[#1A1A1A] dark:text-[#F4F4F0]`}>
+                          <Icon name="usercheck" size={14} className="text-[#007577]" /> {contact.articulador}
+                       </span>
+                    </div>
+                  )}
+                  <div className="md:px-4 md:py-4 shrink-0 hidden md:flex items-center justify-center ml-auto">
                      <button className={`p-2 ${t.inputBgAlt} border-[2px] ${t.border} rounded-md hover:bg-[#B32033] hover:text-white transition-colors ${t.text}`}><Icon name="chevronright" size={16} /></button>
                   </div>
                 </div>
@@ -811,7 +858,13 @@ export default function App() {
                   )}
                   <div>
                     <label className={`text-[10px] md:text-xs font-bold uppercase ${t.textMuted}`}>Situação</label>
-                    <input type="text" name="situacao" value={formData.situacao || ''} onChange={handleFormChange} placeholder="Ex: 4 - Comprometido" className={inputClasses} />
+                    <select name="situacao" value={formData.situacao || ''} onChange={handleFormChange} className={inputClasses}>
+                      <option value="">Selecione...</option>
+                      <option value="1 - Potencial">1 - Potencial</option>
+                      <option value="2 - Abordagem">2 - Abordagem</option>
+                      <option value="3 - Pré alinhado">3 - Pré alinhado</option>
+                      <option value="4 - Comprometido">4 - Comprometido</option>
+                    </select>
                   </div>
                   <div className="sm:col-span-2">
                     <label className={`text-[10px] md:text-xs font-bold uppercase ${t.textMuted}`}>Área de Atuação</label>
@@ -931,12 +984,13 @@ export default function App() {
         .shadow-mondrian { box-shadow: 5px 5px 0 0 var(--border-color); }
         .shadow-mondrian-btn { box-shadow: 3px 3px 0 0 var(--border-color); }
         .shadow-mondrian-btn:active:not(:disabled) { box-shadow: 0 0 0 0 transparent; transform: translate(3px, 3px); }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background-color: var(--border-color); border-radius: 4px; }
       `}} />
 
       <div className="max-w-6xl mx-auto">
         <header className={`mb-6 md:mb-8 flex flex-col sm:flex-row sm:items-end justify-between border-b-[4px] ${t.border} pb-4 md:pb-6 gap-4 relative`}>
           <div className="flex items-center gap-3 md:gap-4 relative z-10">
-            {/* Ícone posicionado à esquerda do título */}
             <div className={`w-12 h-12 md:w-16 md:h-16 flex items-center justify-center flex-shrink-0`}>
               <img src="https://raw.githubusercontent.com/killuixo/tabulum-sig-maplid/refs/heads/main/icon-192.png" alt="Ícone TABULUM" className="w-full h-full object-contain drop-shadow-md rounded-xl" />
             </div>
@@ -961,7 +1015,6 @@ export default function App() {
           </button>
         </nav>
 
-        {/* Global Filter Bar: Aplicável para todas as telas (Universal) */}
         {renderGlobalFilters()}
 
         <main>
@@ -991,3 +1044,4 @@ export default function App() {
     </div>
   );
 }
+```eof
