@@ -39,10 +39,11 @@ const Icon = ({ name, size = 24, className = "" }) => {
 const INITIAL_MOCK_DATA = [];
 
 // Coordenadas REAIS (Longitude e Latitude) para os bairros da grande florianópolis
-// Permitindo que a projeção do mapa GeoJson funcione perfeitamente com as bolhas
+// Agora o mapa base filtrará EXATAMENTE o polígono de Florianópolis
 const MAP_COORDINATES = {
   FLN: {
     "Centro": [-48.548, -27.595],
+    "Sede Insular": [-48.548, -27.595],
     "Sul da Ilha": [-48.502, -27.697],
     "Campeche": [-48.497, -27.681],
     "Armação": [-48.508, -27.750],
@@ -53,7 +54,11 @@ const MAP_COORDINATES = {
     "Continente": [-48.583, -27.604],
     "Coqueiros": [-48.586, -27.608],
     "Lagoa da Conceição": [-48.466, -27.606],
-    "Trindade": [-48.519, -27.584]
+    "Trindade": [-48.519, -27.584],
+    "Sambaqui": [-48.530, -27.470],
+    "Santo Antônio de Lisboa": [-48.515, -27.501],
+    "Rio Vermelho": [-48.396, -27.489],
+    "Ratones": [-48.473, -27.486]
   }
 };
 
@@ -65,7 +70,6 @@ export default function App() {
   const [formData, setFormData] = useState({});
   const [dialog, setDialog] = useState(null); 
   
-  const [isDarkMode] = useState(false);
   const [mapScope, setMapScope] = useState('SC');
   const [directoryViewMode, setDirectoryViewMode] = useState('grid');
   
@@ -99,8 +103,9 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    document.documentElement.style.setProperty('--border-color', isDarkMode ? '#F4F4F0' : '#1A1A1A');
-  }, [isDarkMode]);
+    // Variável CSS de borda fixa, já que não há mais modo escuro
+    document.documentElement.style.setProperty('--border-color', '#1A1A1A');
+  }, []);
 
   useEffect(() => {
     if (filterBase.includes('Base Florianópolis') && !filterBase.includes('Base Santa Catarina')) {
@@ -111,13 +116,13 @@ export default function App() {
   }, [filterBase]);
 
   const t = {
-    bgApp: isDarkMode ? 'bg-[#121212]' : 'bg-[#F4F4F0]',
-    text: isDarkMode ? 'text-[#F4F4F0]' : 'text-[#1A1A1A]',
-    textMuted: isDarkMode ? 'text-gray-400' : 'text-gray-600',
-    border: isDarkMode ? 'border-[#F4F4F0]' : 'border-[#1A1A1A]',
-    cardBg: isDarkMode ? 'bg-[#1E1E1E]' : 'bg-white',
-    inputBg: isDarkMode ? 'bg-[#2A2A2A]' : 'bg-white',
-    inputBgAlt: isDarkMode ? 'bg-[#1E1E1E]' : 'bg-[#EAEAEA]',
+    bgApp: 'bg-[#F4F4F0]',
+    text: 'text-[#1A1A1A]',
+    textMuted: 'text-gray-600',
+    border: 'border-[#1A1A1A]',
+    cardBg: 'bg-white',
+    inputBg: 'bg-white',
+    inputBgAlt: 'bg-[#EAEAEA]',
   };
 
   const baseCard = `border-[3px] ${t.border} rounded-xl shadow-mondrian transition-all`;
@@ -280,8 +285,17 @@ export default function App() {
     const map = {};
     filteredContacts.forEach(c => {
       if (c.base !== 'Base Florianópolis') return;
-      const bName = c.municipio_bairro;
-      if(bName) map[bName] = (map[bName] || 0) + 1;
+      
+      // Agrupa por distrito primariamente se existir, senão bairro, para plotar bolhas de forma mais agregada se desejar,
+      // mas vamos usar o município_bairro ou distrito conforme disponível no MAP_COORDINATES
+      let locName = c.distrito || c.municipio_bairro; 
+      
+      // Ajuste para encontrar a chave correta no MAP_COORDINATES.FLN
+      if (!MAP_COORDINATES.FLN[locName] && c.municipio_bairro && MAP_COORDINATES.FLN[c.municipio_bairro]) {
+         locName = c.municipio_bairro;
+      }
+      
+      if(locName) map[locName] = (map[locName] || 0) + 1;
     });
     return map;
   }, [filteredContacts]);
@@ -330,7 +344,7 @@ export default function App() {
                 <div className={`px-3 py-3 text-sm text-center font-semibold ${t.textMuted}`}>Sem opções</div>
               ) : (
                 options.map(o => (
-                  <label key={o} className={`px-3 py-2 flex items-center gap-3 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 ${t.text}`}>
+                  <label key={o} className={`px-3 py-2 flex items-center gap-3 cursor-pointer hover:bg-gray-200 ${t.text}`}>
                     <input 
                       type="checkbox" 
                       checked={selected.includes(o)} 
@@ -350,7 +364,7 @@ export default function App() {
 
   const SituacaoBadge = ({ situacao }) => {
     if (!situacao) return null;
-    let cor = isDarkMode ? "bg-gray-700 text-white" : "bg-gray-200 text-[#1A1A1A]";
+    let cor = "bg-gray-200 text-[#1A1A1A]";
     if (situacao.includes("4 -")) cor = "bg-[#007577] text-white";
     else if (situacao.includes("3 -")) cor = "bg-[#DCAE1D] text-[#1A1A1A]";
     else if (situacao.includes("1 -") || situacao.includes("2 -")) cor = "bg-[#B32033] text-white";
@@ -359,7 +373,7 @@ export default function App() {
   };
 
   const renderGlobalFilters = () => (
-    <div className={`${mondrianCard} p-4 md:p-6 mb-6 flex flex-col gap-4 bg-[#F4F4F0] dark:bg-[#1E1E1E]`}>
+    <div className={`${mondrianCard} p-4 md:p-6 mb-6 flex flex-col gap-4 bg-[#F4F4F0]`}>
       <div className="flex flex-col md:flex-row gap-4 items-end flex-wrap">
         <div className="w-full md:w-64 flex flex-col gap-1.5 shrink-0">
           <label className={`font-bold text-xs md:text-sm uppercase tracking-wide ${t.textMuted}`}>Buscar</label>
@@ -395,12 +409,13 @@ export default function App() {
   );
 
   const renderRealMapSVG = () => {
-    if (!mapGeoJson) return <div className="p-8 text-center font-bold">Carregando Mapa Real de SC...</div>;
+    if (!mapGeoJson) return <div className="p-8 text-center font-bold">Carregando Mapa Real...</div>;
 
-    const gFpolis = ["Florianópolis", "São José", "Palhoça", "Biguaçu", "Santo Amaro da Imperatriz", "Governador Celso Ramos", "Antônio Carlos", "São Pedro de Alcântara", "Águas Mornas"];
-
+    // A correção principal do Mapa de Florianópolis: 
+    // Filtrar EXATAMENTE a string "Florianópolis" quando o mapScope for 'FLN'.
+    // Isso cria um bounding box perfeito apenas para a ilha e a parte continental de Floripa.
     const featuresToRender = mapGeoJson.features.filter(f =>
-      mapScope === 'SC' ? true : gFpolis.includes(f.properties.name)
+      mapScope === 'SC' ? true : f.properties.name === "Florianópolis"
     );
 
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
@@ -465,7 +480,7 @@ export default function App() {
 
     return (
       <div className={`${baseCard} ${t.cardBg} p-4 md:p-6 flex flex-col lg:col-span-3 shadow-mondrian`}>
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 border-b-[3px] pb-4 border-dashed border-gray-300 dark:border-gray-700">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 border-b-[3px] pb-4 border-dashed border-gray-300">
           <h3 className={`text-xl md:text-2xl font-bold flex items-center gap-2 w-full md:w-auto ${t.text}`}>
             <Icon name="map" size={28} className="text-[#DCAE1D] shrink-0" /> 
             <span className="truncate">Mapa de {mapScope === 'SC' ? 'Santa Catarina' : 'Florianópolis'}</span>
@@ -479,14 +494,14 @@ export default function App() {
                 <div className="w-3 h-3 bg-[#B32033] border border-[#1A1A1A] ml-2"></div> <span className={t.textMuted}>Alto</span>
             </div>
             <div className={`flex border-[3px] ${t.border} rounded-lg overflow-hidden shrink-0`}>
-              <button onClick={() => setMapScope('SC')} className={`px-4 py-2 font-bold transition-colors ${mapScope === 'SC' ? 'bg-[#DCAE1D] text-[#1A1A1A]' : `bg-transparent hover:bg-gray-200 dark:hover:bg-gray-700 ${t.text}`}`}>SC</button>
+              <button onClick={() => setMapScope('SC')} className={`px-4 py-2 font-bold transition-colors ${mapScope === 'SC' ? 'bg-[#DCAE1D] text-[#1A1A1A]' : `bg-transparent hover:bg-gray-200 ${t.text}`}`}>SC</button>
               <div className={`w-[3px] ${t.border}`}></div>
-              <button onClick={() => setMapScope('FLN')} className={`px-4 py-2 font-bold transition-colors ${mapScope === 'FLN' ? 'bg-[#007577] text-white' : `bg-transparent hover:bg-gray-200 dark:hover:bg-gray-700 ${t.text}`}`}>Floripa</button>
+              <button onClick={() => setMapScope('FLN')} className={`px-4 py-2 font-bold transition-colors ${mapScope === 'FLN' ? 'bg-[#007577] text-white' : `bg-transparent hover:bg-gray-200 ${t.text}`}`}>Floripa</button>
             </div>
           </div>
         </div>
 
-        <div className={`relative w-full ${mapScope === 'SC' ? 'aspect-video max-h-[550px]' : 'aspect-[4/3] max-h-[600px] max-w-[500px] mx-auto'} bg-[#EAEAEA] dark:bg-[#121212] rounded-xl border-[3px] ${t.border} overflow-hidden p-2`}>
+        <div className={`relative w-full ${mapScope === 'SC' ? 'aspect-video max-h-[550px]' : 'aspect-[4/3] max-h-[600px] max-w-[500px] mx-auto'} bg-[#1A1A1A] rounded-xl border-[3px] ${t.border} overflow-hidden p-2`}>
           <svg viewBox={`0 0 ${mapWidth} ${mapHeight}`} className="w-full h-full drop-shadow-md">
             {featuresToRender.map((feature, i) => {
               const mName = normalizeStr(feature.properties.name);
@@ -499,7 +514,7 @@ export default function App() {
                 <path 
                   key={i} d={generatePath(feature.geometry)}
                   fill={fillCol} 
-                  stroke={isDarkMode ? "#555" : "#1A1A1A"} 
+                  stroke="#1A1A1A" 
                   strokeWidth={mapScope === 'FLN' ? "1.5" : "1"}
                   className={`transition-all ${mapScope === 'SC' ? 'hover:stroke-[3px] hover:fill-[#DCAE1D] cursor-pointer' : ''}`}
                   onMouseEnter={(e) => {
@@ -515,6 +530,7 @@ export default function App() {
               );
             })}
 
+            {/* Renderização das bolhas para Florianópolis usando coordenadas estritas do GeoJSON */}
             {mapScope === 'FLN' && Object.entries(contatosPorBairro).map(([bairro, count], i) => {
                 const coords = MAP_COORDINATES.FLN[bairro];
                 if (!coords) return null;
@@ -629,7 +645,7 @@ export default function App() {
                   </div>
                   
                   {outrosTemasCount > 0 && (
-                    <div className="mt-3 pt-3 border-t-[3px] border-dashed border-gray-300 dark:border-gray-700 text-xs md:text-sm font-bold text-gray-500 text-center flex justify-center items-center gap-2 shrink-0">
+                    <div className="mt-3 pt-3 border-t-[3px] border-dashed border-gray-300 text-xs md:text-sm font-bold text-gray-500 text-center flex justify-center items-center gap-2 shrink-0">
                       <Icon name="tag" size={14} /> Outros Temas: {outrosTemasCount} entrada(s) separadas
                     </div>
                   )}
@@ -655,7 +671,7 @@ export default function App() {
                       const max = Math.max(...stats.topSituacoes.map(t => t[1]));
                       const percentage = (count / max) * 100;
                       
-                      let colorClass = isDarkMode ? 'bg-gray-400' : 'bg-gray-700';
+                      let colorClass = 'bg-gray-700';
                       if (nome.includes('4 -')) colorClass = 'bg-[#007577]';
                       else if (nome.includes('3 -')) colorClass = 'bg-[#DCAE1D]';
                       else if (nome.includes('2 -')) colorClass = 'bg-[#F4A261]';
@@ -692,11 +708,11 @@ export default function App() {
         <h2 className={`text-xl md:text-2xl font-black flex items-center gap-2 ${t.text}`}><Icon name="directory"/> Diretório Base</h2>
         <div className="flex gap-2 sm:gap-4 flex-col sm:flex-row w-full sm:w-auto">
           <div className={`flex border-[3px] ${t.border} rounded-xl overflow-hidden shadow-mondrian-btn ${t.inputBgAlt} w-full sm:w-auto`}>
-            <button onClick={() => setDirectoryViewMode('grid')} className={`p-2 sm:px-4 sm:py-2 flex-1 sm:flex-none flex items-center justify-center transition-colors ${directoryViewMode === 'grid' ? 'bg-[#DCAE1D] text-[#1A1A1A]' : `bg-transparent hover:bg-gray-500/20 ${t.text}`}`} title="Grade">
+            <button onClick={() => setDirectoryViewMode('grid')} className={`p-2 sm:px-4 sm:py-2 flex-1 sm:flex-none flex items-center justify-center transition-colors ${directoryViewMode === 'grid' ? 'bg-[#DCAE1D] text-[#1A1A1A]' : `bg-transparent hover:bg-gray-200 ${t.text}`}`} title="Grade">
               <Icon name="grid" size={20} />
             </button>
             <div className={`w-[3px] ${t.border}`}></div>
-            <button onClick={() => setDirectoryViewMode('list')} className={`p-2 sm:px-4 sm:py-2 flex-1 sm:flex-none flex items-center justify-center transition-colors ${directoryViewMode === 'list' ? 'bg-[#007577] text-white' : `bg-transparent hover:bg-gray-500/20 ${t.text}`}`} title="Lista">
+            <button onClick={() => setDirectoryViewMode('list')} className={`p-2 sm:px-4 sm:py-2 flex-1 sm:flex-none flex items-center justify-center transition-colors ${directoryViewMode === 'list' ? 'bg-[#007577] text-white' : `bg-transparent hover:bg-gray-200 ${t.text}`}`} title="Lista">
               <Icon name="list" size={20} />
             </button>
           </div>
@@ -727,12 +743,12 @@ export default function App() {
                       </div>
                       <SituacaoBadge situacao={contact.situacao} />
                     </div>
-                    {/* Articuladores inseridos aqui abaixo dos temas */}
-                    <div className={`mt-auto pt-4 border-t-2 border-dashed ${isDarkMode ? 'border-gray-700' : 'border-gray-300'} flex flex-wrap gap-2 items-center justify-between`}>
+                    {/* Articuladores explícitos com texto preto sólido */}
+                    <div className={`mt-auto pt-4 border-t-2 border-dashed border-gray-300 flex flex-wrap gap-2 items-center justify-between`}>
                       <div className="flex flex-col gap-1.5 max-w-[70%]">
                         <span className={`text-[10px] md:text-xs font-bold truncate ${t.textMuted}`}><Icon name="tag" size={12} className="inline mr-1"/>{contact.temas || 'S/ Tema'}</span>
                         {contact.articulador && (
-                          <span className={`text-[10px] md:text-xs font-black truncate text-black dark:text-white`}><Icon name="usercheck" size={12} className="inline mr-1"/>{contact.articulador}</span>
+                          <span className={`text-[10px] md:text-xs font-black truncate text-black`}><Icon name="usercheck" size={12} className="inline mr-1"/>{contact.articulador}</span>
                         )}
                       </div>
                       <button className={`p-2 ${t.inputBgAlt} border-[2px] ${t.border} rounded-md hover:bg-[#B32033] hover:text-white transition-colors shrink-0 ${t.text}`}><Icon name="chevronright" size={16} /></button>
@@ -755,7 +771,7 @@ export default function App() {
                       <span className="truncate">{contact.municipio_bairro} {contact.distrito ? `- ${contact.distrito}` : ''}</span>
                     </div>
                   </div>
-                  <div className="md:px-4 md:py-4 flex-1 hidden sm:block border-t-2 md:border-t-0 md:border-l-2 border-dashed border-gray-300 dark:border-gray-700">
+                  <div className="md:px-4 md:py-4 flex-1 hidden sm:block border-t-2 md:border-t-0 md:border-l-2 border-dashed border-gray-300">
                     <span className={`text-[10px] md:text-xs font-bold truncate block ${t.textMuted}`}>Tema</span>
                     <span className={`text-xs md:text-sm font-bold truncate block ${t.text}`}><Icon name="tag" size={12} className="inline mr-1"/>{contact.temas || 'S/ Tema'}</span>
                   </div>
@@ -763,9 +779,9 @@ export default function App() {
                     <SituacaoBadge situacao={contact.situacao} />
                   </div>
                   {contact.articulador && (
-                    <div className="md:px-4 md:py-4 md:w-40 shrink-0 hidden md:block border-l-2 border-dashed border-gray-300 dark:border-gray-700">
+                    <div className="md:px-4 md:py-4 md:w-40 shrink-0 hidden md:block border-l-2 border-dashed border-gray-300">
                        <span className={`text-[10px] md:text-xs font-bold truncate block ${t.textMuted}`}>Articulador</span>
-                       <span className={`text-xs font-black truncate flex items-center gap-1 text-black dark:text-white`}>
+                       <span className={`text-xs font-black truncate flex items-center gap-1 text-black`}>
                           <Icon name="usercheck" size={14} className="text-[#007577]" /> {contact.articulador}
                        </span>
                     </div>
@@ -936,7 +952,7 @@ export default function App() {
                     {selectedContact.articulador && (
                       <div>
                         <label className="text-[10px] md:text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">Articulador(a)</label>
-                        <p className={`font-bold flex items-center gap-2 text-base md:text-lg text-black dark:text-white`}>
+                        <p className={`font-bold flex items-center gap-2 text-base md:text-lg text-black`}>
                           <span className="text-[#B32033] shrink-0"><Icon name="usercheck" size={18} /></span> {selectedContact.articulador}
                         </p>
                       </div>
