@@ -38,33 +38,22 @@ const Icon = ({ name, size = 24, className = "" }) => {
 
 const INITIAL_MOCK_DATA = [];
 
+// Coordenadas REAIS (Longitude e Latitude) para os bairros da grande florianópolis
+// Permitindo que a projeção do mapa GeoJson funcione perfeitamente com as bolhas
 const MAP_COORDINATES = {
-  SC: {
-    "Florianópolis": { x: 88, y: 55 },
-    "Santo Amaro da Imperatriz": { x: 85, y: 55 },
-    "São José": { x: 87, y: 54 },
-    "Palhoça": { x: 86, y: 56 },
-    "Joinville": { x: 85, y: 20 },
-    "Chapecó": { x: 15, y: 45 },
-    "Criciúma": { x: 80, y: 85 },
-    "Lages": { x: 55, y: 65 },
-    "Blumenau": { x: 75, y: 35 },
-    "Itajaí": { x: 85, y: 35 },
-    "Garopaba": { x: 87, y: 65 }
-  },
   FLN: {
-    "Centro": { x: 45, y: 45 },
-    "Sul da Ilha": { x: 55, y: 75 },
-    "Campeche": { x: 58, y: 70 },
-    "Armação": { x: 60, y: 85 },
-    "Rio Tavares": { x: 55, y: 65 },
-    "Norte da Ilha": { x: 50, y: 20 },
-    "Ingleses": { x: 65, y: 15 },
-    "Canasvieiras": { x: 45, y: 10 },
-    "Continente": { x: 30, y: 42 },
-    "Coqueiros": { x: 32, y: 45 },
-    "Lagoa da Conceição": { x: 65, y: 45 },
-    "Trindade": { x: 48, y: 40 }
+    "Centro": [-48.548, -27.595],
+    "Sul da Ilha": [-48.502, -27.697],
+    "Campeche": [-48.497, -27.681],
+    "Armação": [-48.508, -27.750],
+    "Rio Tavares": [-48.481, -27.650],
+    "Norte da Ilha": [-48.450, -27.440],
+    "Ingleses": [-48.394, -27.438],
+    "Canasvieiras": [-48.461, -27.430],
+    "Continente": [-48.583, -27.604],
+    "Coqueiros": [-48.586, -27.608],
+    "Lagoa da Conceição": [-48.466, -27.606],
+    "Trindade": [-48.519, -27.584]
   }
 };
 
@@ -544,7 +533,7 @@ export default function App() {
                      onClick={() => handleMapClick('Base Florianópolis', bairro)}
                   >
                     <circle cx={proj.x} cy={proj.y} r={size} fill={color} opacity="0.4" className="animate-pulse" />
-                    <circle cx={proj.x} cy={proj.y} r={size * 0.6} fill={color} stroke="#F4F4F0" strokeWidth="2" className="group-hover:stroke-4 transition-all" />
+                    <circle cx={proj.x} cy={proj.y} r={size * 0.6} fill={color} stroke="#F4F4F0" strokeWidth="2" className="group-hover:stroke-[4px] transition-all" />
                   </g>
                 );
             })}
@@ -566,7 +555,6 @@ export default function App() {
   };
 
   const renderDashboard = () => {
-    // Lógica Temas: Separar "OUTROS TEMAS" da lista e permitir ordenação
     const temaEntries = Object.entries(stats.temaCounts || {});
     const displayTemas = temaEntries.filter(([nome]) => nome.toUpperCase() !== 'OUTROS TEMAS' && nome.trim() !== '');
     const outrosTemasCount = temaEntries.find(([nome]) => nome.toUpperCase() === 'OUTROS TEMAS')?.[1] || 0;
@@ -579,7 +567,6 @@ export default function App() {
       }
     });
 
-    // Lógica Gráfico de Pizza (Situação)
     const totalSituacoes = stats.topSituacoes.reduce((sum, item) => sum + item[1], 0);
     let cumulative = 0;
     const pieSlices = stats.topSituacoes.map(([nome, count]) => {
@@ -652,34 +639,37 @@ export default function App() {
               )}
             </div>
 
-            <div className={`${mondrianCard} p-6 flex flex-col h-[450px] md:h-[500px]`}>
+            <div className={`${mondrianCard} p-6 flex flex-col h-auto lg:h-[500px]`}>
               <h3 className={`text-xl md:text-2xl font-bold mb-6 border-b-[3px] ${t.border} pb-2 flex items-center gap-2 ${t.text} shrink-0`}>
                 <Icon name="check" /> Status de Alinhamento
               </h3>
               
               {totalSituacoes > 0 ? (
-                <div className="flex flex-col sm:flex-row items-center gap-6 md:gap-10 mt-auto mb-auto overflow-y-auto custom-scrollbar pr-2">
+                <div className="flex flex-col lg:flex-row items-center gap-8 mt-auto mb-auto w-full overflow-y-auto custom-scrollbar pr-2">
                   <div 
-                    className="w-40 h-40 md:w-52 md:h-52 rounded-full border-[4px] border-[#1A1A1A] shadow-mondrian shrink-0" 
+                    className="w-48 h-48 md:w-56 md:h-56 rounded-full border-[4px] border-[#1A1A1A] shadow-mondrian shrink-0" 
                     style={{ background: conicGradient }}
                   ></div>
-                  <div className="flex flex-col gap-3 w-full justify-center">
+                  <div className="flex flex-col gap-4 w-full justify-center">
                     {stats.topSituacoes.map(([nome, count]) => {
-                      let colorClass = 'bg-gray-500';
-                      if (nome.includes('1 -')) colorClass = 'bg-[#B32033]';
-                      else if (nome.includes('2 -')) colorClass = 'bg-[#F4A261]';
+                      const max = Math.max(...stats.topSituacoes.map(t => t[1]));
+                      const percentage = (count / max) * 100;
+                      
+                      let colorClass = isDarkMode ? 'bg-gray-400' : 'bg-gray-700';
+                      if (nome.includes('4 -')) colorClass = 'bg-[#007577]';
                       else if (nome.includes('3 -')) colorClass = 'bg-[#DCAE1D]';
-                      else if (nome.includes('4 -')) colorClass = 'bg-[#007577]';
-
-                      const percent = ((count / totalSituacoes) * 100).toFixed(1);
+                      else if (nome.includes('2 -')) colorClass = 'bg-[#F4A261]';
+                      else if (nome.includes('1 -')) colorClass = 'bg-[#B32033]';
 
                       return (
-                        <div key={nome} className={`flex items-center justify-between text-xs md:text-sm font-bold p-2 rounded-md border-[2px] ${t.border} bg-white dark:bg-[#2A2A2A] shadow-sm`}>
-                          <div className="flex items-center gap-2 truncate pr-2">
-                            <span className={`w-4 h-4 rounded-sm border-[2px] border-[#1A1A1A] shrink-0 ${colorClass}`}></span>
-                            <span className={`truncate ${t.text}`}>{nome}</span>
+                        <div key={nome} className="w-full">
+                          <div className={`flex justify-between text-sm font-bold mb-1 ${t.text}`}>
+                            <span className="truncate pr-4">{nome}</span>
+                            <span className="shrink-0">{count} conts.</span>
                           </div>
-                          <span className={`shrink-0 ${t.textMuted}`}>{percent}% ({count})</span>
+                          <div className={`h-4 w-full ${t.inputBgAlt} rounded-full border-[2px] ${t.border} overflow-hidden`}>
+                            <div className={`h-full ${colorClass} transition-all duration-1000 border-r-[2px] ${t.border}`} style={{ width: `${percentage}%` }}></div>
+                          </div>
                         </div>
                       );
                     })}
@@ -737,11 +727,12 @@ export default function App() {
                       </div>
                       <SituacaoBadge situacao={contact.situacao} />
                     </div>
+                    {/* Articuladores inseridos aqui abaixo dos temas */}
                     <div className={`mt-auto pt-4 border-t-2 border-dashed ${isDarkMode ? 'border-gray-700' : 'border-gray-300'} flex flex-wrap gap-2 items-center justify-between`}>
                       <div className="flex flex-col gap-1.5 max-w-[70%]">
                         <span className={`text-[10px] md:text-xs font-bold truncate ${t.textMuted}`}><Icon name="tag" size={12} className="inline mr-1"/>{contact.temas || 'S/ Tema'}</span>
                         {contact.articulador && (
-                          <span className={`text-[10px] md:text-xs font-bold truncate text-[#1A1A1A] dark:text-[#F4F4F0]`}><Icon name="usercheck" size={12} className="inline mr-1"/>{contact.articulador}</span>
+                          <span className={`text-[10px] md:text-xs font-black truncate text-black dark:text-white`}><Icon name="usercheck" size={12} className="inline mr-1"/>{contact.articulador}</span>
                         )}
                       </div>
                       <button className={`p-2 ${t.inputBgAlt} border-[2px] ${t.border} rounded-md hover:bg-[#B32033] hover:text-white transition-colors shrink-0 ${t.text}`}><Icon name="chevronright" size={16} /></button>
@@ -774,7 +765,7 @@ export default function App() {
                   {contact.articulador && (
                     <div className="md:px-4 md:py-4 md:w-40 shrink-0 hidden md:block border-l-2 border-dashed border-gray-300 dark:border-gray-700">
                        <span className={`text-[10px] md:text-xs font-bold truncate block ${t.textMuted}`}>Articulador</span>
-                       <span className={`text-xs font-bold truncate flex items-center gap-1 text-[#1A1A1A] dark:text-[#F4F4F0]`}>
+                       <span className={`text-xs font-black truncate flex items-center gap-1 text-black dark:text-white`}>
                           <Icon name="usercheck" size={14} className="text-[#007577]" /> {contact.articulador}
                        </span>
                     </div>
@@ -945,7 +936,7 @@ export default function App() {
                     {selectedContact.articulador && (
                       <div>
                         <label className="text-[10px] md:text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">Articulador(a)</label>
-                        <p className={`font-bold flex items-center gap-2 text-base md:text-lg text-[#1A1A1A] dark:text-[#F4F4F0]`}>
+                        <p className={`font-bold flex items-center gap-2 text-base md:text-lg text-black dark:text-white`}>
                           <span className="text-[#B32033] shrink-0"><Icon name="usercheck" size={18} /></span> {selectedContact.articulador}
                         </p>
                       </div>
@@ -1044,3 +1035,4 @@ export default function App() {
     </div>
   );
 }
+```eof
