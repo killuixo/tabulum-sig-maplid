@@ -28,8 +28,9 @@ const Icon = ({ name, size = 24, className = "" }) => {
     edit: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7 M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />,
     trash: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />,
     save: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />,
-    filter: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />,
-    download: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+    download: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />,
+    pdf: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2zM9 9h3m-3 4h6m-6 4h6M13 3v4a2 2 0 002 2h4" />,
+    filter: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
   };
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" className={className}>
@@ -74,7 +75,7 @@ export default function App() {
   const [dialog, setDialog] = useState(null); 
   
   const [mapScope, setMapScope] = useState('SC');
-  const [directoryViewMode, setDirectoryViewMode] = useState('grid');
+  const [directoryViewMode, setDirectoryViewMode] = useState('list'); // Default changed to list for table view
   
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -90,6 +91,10 @@ export default function App() {
   const [filterRegiaoSc, setFilterRegiaoSc] = useState([]);
   const [filterMunicipioSc, setFilterMunicipioSc] = useState([]);
 
+  // Sort states
+  const [sortConfig, setSortConfig] = useState({ key: 'lideranca', direction: 'asc' });
+  const [modalSortConfig, setModalSortConfig] = useState({ key: 'lideranca', direction: 'asc' });
+  
   const [isLoading, setIsLoading] = useState(false);
   const [temaSort, setTemaSort] = useState({ column: 'count', direction: 'desc' });
 
@@ -269,8 +274,37 @@ export default function App() {
     });
   }, [contacts, filterBase, filterArticulador, filterTemas, filterSituacao, filterPhoneStatus, searchTerm, filterDistritoFln, filterBairroFln, filterRegiaoSc, filterMunicipioSc]);
 
+  // Main Directory Sorting
+  const sortedContacts = useMemo(() => {
+    let sortableItems = [...filteredContacts];
+    if (sortConfig && sortConfig.key) {
+      sortableItems.sort((a, b) => {
+        let valA = a[sortConfig.key] || '';
+        let valB = b[sortConfig.key] || '';
+        if (typeof valA === 'string') valA = valA.trim().toLowerCase();
+        if (typeof valB === 'string') valB = valB.trim().toLowerCase();
+        
+        if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+    return sortableItems;
+  }, [filteredContacts, sortConfig]);
+
+  const requestSort = (key) => {
+    let direction = 'asc';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc';
+    setSortConfig({ key, direction });
+  };
+
+  const getSortIcon = (key, config) => {
+    if (!config || config.key !== key) return <span className="text-gray-400 ml-1 opacity-50">↕</span>;
+    return config.direction === 'asc' ? <span className="text-[#007577] ml-1">▲</span> : <span className="text-[#007577] ml-1">▼</span>;
+  };
+
   const handleExportCSV = () => {
-    if (filteredContacts.length === 0) {
+    if (sortedContacts.length === 0) {
       setDialog({ type: 'alert', message: "Não há contatos filtrados para exportar." });
       return;
     }
@@ -283,7 +317,7 @@ export default function App() {
 
     const csvRows = [headers.join(",")];
 
-    for (const c of filteredContacts) {
+    for (const c of sortedContacts) { // Exporting the SORTED contacts
       const row = [
         c.lideranca, c.base, c.municipio_bairro, 
         c.regiao, c.distrito, c.situacao, c.area_de_atuacao, 
@@ -291,9 +325,7 @@ export default function App() {
       ].map(value => {
         if (value === null || value === undefined) return '""';
         let str = String(value);
-        // Protege contra aspas duplas no texto para nao quebrar a coluna do CSV
         str = str.replace(/"/g, '""');
-        // Se a string tem virgula, quebra de linha ou aspas, precisamos encapsular tudo em aspas duplas
         if (str.search(/("|,|\n)/g) >= 0) {
           str = `"${str}"`;
         }
@@ -303,7 +335,6 @@ export default function App() {
     }
 
     const csvString = csvRows.join("\n");
-    // Adiciona o BOM para o Excel ou Sheets decodificarem os acentos (utf-8) corretamente.
     const blob = new Blob(["\ufeff" + csvString], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     
@@ -315,37 +346,41 @@ export default function App() {
     document.body.removeChild(link);
   };
 
+  const handleExportPDF = () => {
+     window.print();
+  };
+
   const stats = useMemo(() => {
-    const floripaCount = filteredContacts.filter(c => c.base === 'Base Florianópolis').length;
-    const scCount = filteredContacts.filter(c => c.base === 'Base Santa Catarina').length;
+    const floripaCount = sortedContacts.filter(c => c.base === 'Base Florianópolis').length;
+    const scCount = sortedContacts.filter(c => c.base === 'Base Santa Catarina').length;
     
-    const temaCounts = filteredContacts.reduce((acc, curr) => {
+    const temaCounts = sortedContacts.reduce((acc, curr) => {
       if(curr.temas) acc[curr.temas] = (acc[curr.temas] || 0) + 1;
       return acc;
     }, {});
 
-    const situacaoCounts = filteredContacts.reduce((acc, curr) => {
+    const situacaoCounts = sortedContacts.reduce((acc, curr) => {
       if(curr.situacao) acc[curr.situacao] = (acc[curr.situacao] || 0) + 1;
       return acc;
     }, {});
     const topSituacoes = Object.entries(situacaoCounts).sort((a, b) => a[0].localeCompare(b[0]));
 
-    return { total: filteredContacts.length, floripaCount, scCount, temaCounts, topSituacoes };
-  }, [filteredContacts]);
+    return { total: sortedContacts.length, floripaCount, scCount, temaCounts, topSituacoes };
+  }, [sortedContacts]);
 
   const contatosPorMuni = useMemo(() => {
     const map = {};
-    filteredContacts.forEach(c => {
+    sortedContacts.forEach(c => {
       if (c.base !== 'Base Santa Catarina') return;
       const mName = normalizeStr(c.municipio_bairro);
       if(mName) map[mName] = (map[mName] || 0) + 1;
     });
     return map;
-  }, [filteredContacts]);
+  }, [sortedContacts]);
 
   const contatosPorBairro = useMemo(() => {
     const map = {};
-    filteredContacts.forEach(c => {
+    sortedContacts.forEach(c => {
       if (c.base !== 'Base Florianópolis') return;
       let locName = c.distrito || c.municipio_bairro; 
       if (!MAP_COORDINATES.FLN[locName] && c.municipio_bairro && MAP_COORDINATES.FLN[c.municipio_bairro]) {
@@ -354,7 +389,7 @@ export default function App() {
       if(locName) map[locName] = (map[locName] || 0) + 1;
     });
     return map;
-  }, [filteredContacts]);
+  }, [sortedContacts]);
 
   const handleSortTemas = (column) => {
     if (temaSort.column === column) {
@@ -425,7 +460,7 @@ export default function App() {
     else if (String(situacao).includes("3 -")) cor = "bg-[#DCAE1D] text-[#1A1A1A]";
     else if (String(situacao).includes("1 -") || String(situacao).includes("2 -")) cor = "bg-[#B32033] text-white";
     else if (String(situacao).includes("2 -")) cor = "bg-[#F4A261] text-white"; 
-    return <span className={`px-2 py-1 text-[10px] md:text-xs font-bold rounded-md border-[2px] ${t.border} ${cor} truncate max-w-full block`}>{situacao}</span>;
+    return <span className={`px-2 py-1 text-[10px] md:text-xs font-bold rounded-md border-[2px] ${t.border} ${cor} truncate max-w-full block text-center`}>{situacao}</span>;
   };
 
   const renderGlobalFilters = () => (
@@ -780,27 +815,32 @@ export default function App() {
       <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4">
         <h2 className={`text-xl md:text-2xl font-black flex items-center gap-2 ${t.text}`}><Icon name="directory"/> Diretório Base</h2>
         <div className="flex gap-2 sm:gap-4 flex-col sm:flex-row w-full sm:w-auto">
+          
+          <div className="flex border-[3px] border-[#1A1A1A] rounded-xl overflow-hidden shadow-mondrian-btn bg-white w-full sm:w-auto shrink-0">
+            <button onClick={handleExportPDF} className="p-2 sm:px-4 sm:py-2 flex-1 sm:flex-none flex items-center justify-center transition-colors hover:bg-gray-200 text-black border-r-[3px] border-[#1A1A1A]" title="Imprimir / Salvar PDF">
+              <Icon name="pdf" size={20} className="mr-1 sm:mr-2" /> <span className="text-sm md:text-base font-bold">PDF</span>
+            </button>
+            <button onClick={handleExportCSV} className="p-2 sm:px-4 sm:py-2 flex-1 sm:flex-none flex items-center justify-center transition-colors hover:bg-gray-200 text-black" title="Baixar CSV">
+              <Icon name="download" size={20} className="mr-1 sm:mr-2" /> <span className="text-sm md:text-base font-bold">CSV</span>
+            </button>
+          </div>
+
           <div className={`flex border-[3px] ${t.border} rounded-xl overflow-hidden shadow-mondrian-btn ${t.inputBgAlt} w-full sm:w-auto`}>
-            <button onClick={() => setDirectoryViewMode('grid')} className={`p-2 sm:px-4 sm:py-2 flex-1 sm:flex-none flex items-center justify-center transition-colors ${directoryViewMode === 'grid' ? 'bg-[#DCAE1D] text-[#1A1A1A]' : `bg-transparent hover:bg-gray-200 ${t.text}`}`} title="Grade">
+            <button onClick={() => setDirectoryViewMode('grid')} className={`p-2 sm:px-4 sm:py-2 flex-1 sm:flex-none flex items-center justify-center transition-colors ${directoryViewMode === 'grid' ? 'bg-[#DCAE1D] text-[#1A1A1A]' : `bg-transparent hover:bg-gray-200 ${t.text}`}`} title="Visualização em Grade">
               <Icon name="grid" size={20} />
             </button>
             <div className={`w-[3px] ${t.border}`}></div>
-            <button onClick={() => setDirectoryViewMode('list')} className={`p-2 sm:px-4 sm:py-2 flex-1 sm:flex-none flex items-center justify-center transition-colors ${directoryViewMode === 'list' ? 'bg-[#007577] text-white' : `bg-transparent hover:bg-gray-200 ${t.text}`}`} title="Lista">
+            <button onClick={() => setDirectoryViewMode('list')} className={`p-2 sm:px-4 sm:py-2 flex-1 sm:flex-none flex items-center justify-center transition-colors ${directoryViewMode === 'list' ? 'bg-[#007577] text-white' : `bg-transparent hover:bg-gray-200 ${t.text}`}`} title="Tabela Dinâmica">
               <Icon name="list" size={20} />
             </button>
           </div>
-          
-          <button onClick={handleExportCSV} className={`${mondrianButton} ${t.inputBgAlt} ${t.text} hover:-translate-y-1 w-full sm:w-auto`}>
-            <Icon name="download" size={20} /> Exportar CSV
-          </button>
-          
           <button onClick={openNewContactModal} className={`${mondrianButton} bg-[#007577] text-white hover:-translate-y-1 w-full sm:w-auto`}>
             <Icon name="plus" size={20} /> Adicionar
           </button>
         </div>
       </div>
 
-      {filteredContacts.length === 0 ? (
+      {sortedContacts.length === 0 ? (
         <div className={`col-span-full py-12 px-4 text-center border-[3px] border-dashed ${t.border} rounded-xl ${t.cardBg}`}>
           <Icon name="alert" size={48} className="mx-auto mb-4 text-[#B32033]" />
           <h3 className={`text-xl md:text-2xl font-bold ${t.text}`}>Nenhum contato encontrado</h3>
@@ -809,7 +849,7 @@ export default function App() {
         <>
           {directoryViewMode === 'grid' && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredContacts.map(contact => (
+              {sortedContacts.map(contact => (
                 <div key={contact.id} onClick={() => { setSelectedContact(contact); setIsEditMode(false); }} className={`${mondrianCard} hover:-translate-y-1 hover:shadow-mondrian-btn cursor-pointer flex flex-col h-full`}>
                   <div className={`h-3 w-full border-b-[3px] ${t.border} ${contact.base.includes('Florianópolis') ? 'bg-[#007577]' : 'bg-[#DCAE1D]'}`}></div>
                   <div className="p-4 md:p-5 flex-grow flex flex-col gap-3">
@@ -821,7 +861,6 @@ export default function App() {
                       </div>
                       <SituacaoBadge situacao={contact.situacao} />
                     </div>
-                    {/* Botão interativo do Articulador no Grid */}
                     <div className={`mt-auto pt-4 border-t-2 border-dashed border-gray-300 flex flex-wrap gap-2 items-center justify-between`}>
                       <div className="flex flex-col gap-1.5 max-w-[70%]">
                         <span className={`text-[10px] md:text-xs font-bold truncate ${t.textMuted}`}><Icon name="tag" size={12} className="inline mr-1"/>{contact.temas || 'S/ Tema'}</span>
@@ -844,42 +883,73 @@ export default function App() {
           )}
 
           {directoryViewMode === 'list' && (
-            <div className="flex flex-col gap-3">
-              {filteredContacts.map(contact => (
-                <div key={contact.id} onClick={() => { setSelectedContact(contact); setIsEditMode(false); }} className={`${mondrianCard} relative overflow-hidden hover:-translate-y-1 hover:shadow-mondrian-btn cursor-pointer p-4 md:p-0 flex flex-col md:flex-row md:items-center gap-3 md:gap-0`}>
-                  <div className={`h-2 w-full md:w-3 md:h-full absolute left-0 top-0 md:bottom-0 ${contact.base.includes('Florianópolis') ? 'bg-[#007577]' : 'bg-[#DCAE1D]'}`}></div>
-                  <div className="md:pl-6 md:pr-4 md:py-4 flex-1 mt-2 md:mt-0">
-                    <h3 className={`text-base md:text-lg font-bold leading-tight mb-1 truncate ${t.text}`}>{contact.lideranca}</h3>
-                    <div className={`flex items-start text-[10px] md:text-xs font-semibold gap-1 ${t.textMuted}`}>
-                      <span className="text-[#B32033] mt-0.5 shrink-0"><Icon name="mappin" size={12} /></span> 
-                      <span className="truncate">{contact.municipio_bairro} {contact.distrito ? `- ${contact.distrito}` : ''}</span>
-                    </div>
-                  </div>
-                  <div className="md:px-4 md:py-4 flex-1 hidden sm:block border-t-2 md:border-t-0 md:border-l-2 border-dashed border-gray-300">
-                    <span className={`text-[10px] md:text-xs font-bold truncate block ${t.textMuted}`}>Tema</span>
-                    <span className={`text-xs md:text-sm font-bold truncate block ${t.text}`}><Icon name="tag" size={12} className="inline mr-1"/>{contact.temas || 'S/ Tema'}</span>
-                  </div>
-                  <div className="md:px-4 md:py-4 md:w-48 shrink-0 flex items-center">
-                    <SituacaoBadge situacao={contact.situacao} />
-                  </div>
-                  {/* Botão interativo do Articulador na Lista */}
-                  {contact.articulador && (
-                    <div className="md:px-4 md:py-4 md:w-48 shrink-0 hidden md:block border-l-2 border-dashed border-gray-300">
-                       <span className={`text-[10px] md:text-xs font-bold truncate block ${t.textMuted}`}>Articulador</span>
-                       <button 
-                          onClick={(e) => { e.stopPropagation(); setSelectedArticuladorProfile(contact.articulador); }} 
-                          className={`text-xs font-black truncate flex items-center gap-1 text-[#007577] hover:underline bg-[#EAEAEA] px-1.5 py-0.5 rounded border border-gray-300 w-full`}
-                          title="Ver ficha desta assessoria"
-                       >
-                          <Icon name="usercheck" size={14} className="shrink-0" /> <span className="truncate">{contact.articulador}</span>
-                       </button>
-                    </div>
-                  )}
-                  <div className="md:px-4 md:py-4 shrink-0 hidden md:flex items-center justify-center ml-auto border-l-2 border-dashed border-gray-300">
-                     <button className={`p-2 ${t.inputBgAlt} border-[2px] ${t.border} rounded-md hover:bg-[#B32033] hover:text-white transition-colors ${t.text}`}><Icon name="chevronright" size={16} /></button>
-                  </div>
-                </div>
-              ))}
+            <div className={`${mondrianCard} overflow-x-auto custom-scrollbar`}>
+              <table className="w-full text-left border-collapse min-w-[1000px]">
+                <thead className="bg-[#EAEAEA] border-b-[3px] border-[#1A1A1A]">
+                  <tr>
+                    <th className="p-3 md:p-4 font-black text-sm text-gray-700 uppercase cursor-pointer hover:bg-gray-200 select-none whitespace-nowrap" onClick={() => requestSort('lideranca')}>
+                      Liderança {getSortIcon('lideranca', sortConfig)}
+                    </th>
+                    <th className="p-3 md:p-4 font-black text-sm text-gray-700 uppercase cursor-pointer hover:bg-gray-200 select-none whitespace-nowrap" onClick={() => requestSort('base')}>
+                      Base {getSortIcon('base', sortConfig)}
+                    </th>
+                    <th className="p-3 md:p-4 font-black text-sm text-gray-700 uppercase cursor-pointer hover:bg-gray-200 select-none whitespace-nowrap" onClick={() => requestSort('municipio_bairro')}>
+                      Município/Bairro {getSortIcon('municipio_bairro', sortConfig)}
+                    </th>
+                    <th className="p-3 md:p-4 font-black text-sm text-gray-700 uppercase cursor-pointer hover:bg-gray-200 select-none whitespace-nowrap" onClick={() => requestSort('regiao')}>
+                      Região {getSortIcon('regiao', sortConfig)}
+                    </th>
+                    <th className="p-3 md:p-4 font-black text-sm text-gray-700 uppercase cursor-pointer hover:bg-gray-200 select-none whitespace-nowrap" onClick={() => requestSort('distrito')}>
+                      Distrito {getSortIcon('distrito', sortConfig)}
+                    </th>
+                    <th className="p-3 md:p-4 font-black text-sm text-gray-700 uppercase cursor-pointer hover:bg-gray-200 select-none whitespace-nowrap" onClick={() => requestSort('temas')}>
+                      Tema {getSortIcon('temas', sortConfig)}
+                    </th>
+                    <th className="p-3 md:p-4 font-black text-sm text-gray-700 uppercase cursor-pointer hover:bg-gray-200 select-none whitespace-nowrap" onClick={() => requestSort('situacao')}>
+                      Situação {getSortIcon('situacao', sortConfig)}
+                    </th>
+                    <th className="p-3 md:p-4 font-black text-sm text-gray-700 uppercase cursor-pointer hover:bg-gray-200 select-none whitespace-nowrap" onClick={() => requestSort('articulador')}>
+                      Articulador {getSortIcon('articulador', sortConfig)}
+                    </th>
+                    <th className="p-3 md:p-4 font-black text-sm text-gray-700 uppercase text-center whitespace-nowrap">Ação</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedContacts.map(contact => (
+                    <tr key={contact.id} className="border-b border-dashed border-gray-300 hover:bg-gray-50 transition-colors">
+                      <td className="p-3 md:p-4 font-bold text-sm text-[#1A1A1A] max-w-[200px] truncate" title={contact.lideranca}>{contact.lideranca}</td>
+                      <td className="p-3 md:p-4">
+                        <span className={`text-[10px] font-black px-2 py-1 rounded border border-[#1A1A1A] whitespace-nowrap ${contact.base.includes('Florianópolis') ? 'bg-[#007577] text-white' : 'bg-[#DCAE1D] text-[#1A1A1A]'}`}>
+                          {contact.base.replace('Base ', '')}
+                        </span>
+                      </td>
+                      <td className="p-3 md:p-4 text-xs font-semibold text-gray-600 truncate max-w-[150px]" title={contact.municipio_bairro}>{contact.municipio_bairro || '-'}</td>
+                      <td className="p-3 md:p-4 text-xs font-semibold text-gray-600 truncate max-w-[120px]" title={contact.regiao}>{contact.regiao || '-'}</td>
+                      <td className="p-3 md:p-4 text-xs font-semibold text-gray-600 truncate max-w-[120px]" title={contact.distrito}>{contact.distrito || '-'}</td>
+                      <td className="p-3 md:p-4 text-xs font-bold text-gray-700 max-w-[150px] truncate" title={contact.temas}>{contact.temas || '-'}</td>
+                      <td className="p-3 md:p-4"><SituacaoBadge situacao={contact.situacao} /></td>
+                      <td className="p-3 md:p-4">
+                         {contact.articulador ? (
+                           <button 
+                             onClick={(e) => { e.stopPropagation(); setSelectedArticuladorProfile(contact.articulador); }} 
+                             className="text-xs font-black truncate text-[#007577] hover:underline flex items-center"
+                           >
+                             <Icon name="usercheck" size={12} className="mr-1 shrink-0"/> {contact.articulador}
+                           </button>
+                         ) : '-'}
+                      </td>
+                      <td className="p-3 md:p-4 text-center">
+                         <button 
+                           onClick={() => { setSelectedContact(contact); setIsEditMode(false); }} 
+                           className="text-xs font-bold px-3 py-1.5 bg-[#1A1A1A] text-white rounded hover:bg-[#DCAE1D] hover:text-[#1A1A1A] transition-colors shadow-sm whitespace-nowrap"
+                         >
+                           Ver Ficha
+                         </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </>
@@ -892,7 +962,7 @@ export default function App() {
     const inputClasses = `w-full px-3 py-2 mt-1 rounded border-[2px] ${t.border} font-medium ${t.inputBg} ${t.text} text-sm md:text-base focus:outline-none focus:ring-2 focus:ring-[#B32033]`;
 
     return (
-      <div className="fixed inset-0 z-[50] flex items-center justify-center p-2 sm:p-4 bg-black/70 backdrop-blur-sm animation-fade-in">
+      <div className="fixed inset-0 z-[50] flex items-center justify-center p-2 sm:p-4 bg-black/70 backdrop-blur-sm animation-fade-in print:hidden">
         <div className={`${mondrianCard} w-full max-w-3xl max-h-[95vh] overflow-y-auto relative flex flex-col md:flex-row`}>
           <div className={`hidden md:block w-8 border-r-[3px] ${t.border} ${isEditMode ? 'bg-[#DCAE1D]' : 'bg-[#B32033]'} flex-shrink-0 transition-colors`}></div>
           <div className="flex-grow p-4 md:p-8">
@@ -1030,14 +1100,7 @@ export default function App() {
                     </div>
                     <div>
                       <label className="text-[10px] md:text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">Telefone</label>
-                      <p className={`font-bold flex items-center gap-2 text-sm md:text-base break-all ${t.text}`}>
-                        <span className="text-[#DCAE1D] shrink-0"><Icon name="phone" size={16}/></span> 
-                        {selectedContact.telefone ? (
-                          <span>{selectedContact.telefone}</span>
-                        ) : (
-                          <span className="text-[#B32033] bg-[#B32033]/10 px-2 py-0.5 rounded">Sem Telefone</span>
-                        )}
-                      </p>
+                      <p className={`font-bold flex items-center gap-2 text-sm md:text-base break-all ${t.text}`}><span className="text-[#DCAE1D] shrink-0"><Icon name="phone" size={16}/></span> {selectedContact.telefone || 'N/A'}</p>
                     </div>
                     <div>
                       <label className="text-[10px] md:text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">E-mail</label>
@@ -1084,12 +1147,32 @@ export default function App() {
     if (!selectedArticuladorProfile) return null;
     
     const articuladorContacts = contacts.filter(c => c.articulador === selectedArticuladorProfile);
+    
+    const requestModalSort = (key) => {
+      let direction = 'asc';
+      if (modalSortConfig && modalSortConfig.key === key && modalSortConfig.direction === 'asc') direction = 'desc';
+      setModalSortConfig({ key, direction });
+    };
+
+    const sortedModalContacts = [...articuladorContacts].sort((a, b) => {
+      if (modalSortConfig && modalSortConfig.key) {
+        let valA = a[modalSortConfig.key] || '';
+        let valB = b[modalSortConfig.key] || '';
+        if (typeof valA === 'string') valA = valA.trim().toLowerCase();
+        if (typeof valB === 'string') valB = valB.trim().toLowerCase();
+        
+        if (valA < valB) return modalSortConfig.direction === 'asc' ? -1 : 1;
+        if (valA > valB) return modalSortConfig.direction === 'asc' ? 1 : -1;
+      }
+      return 0;
+    });
+
     const withPhone = articuladorContacts.filter(c => c.telefone && String(c.telefone).trim() !== '').length;
     const withoutPhone = articuladorContacts.length - withPhone;
 
     return (
-      <div className="fixed inset-0 z-[60] flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-sm animation-fade-in">
-         <div className={`${mondrianCard} w-full max-w-4xl max-h-[95vh] overflow-hidden relative flex flex-col`}>
+      <div className="fixed inset-0 z-[60] flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-sm animation-fade-in print:hidden">
+         <div className={`${mondrianCard} w-full max-w-5xl max-h-[95vh] overflow-hidden relative flex flex-col`}>
             <div className="p-4 md:p-6 border-b-[3px] border-[#1A1A1A] flex flex-col md:flex-row justify-between items-start md:items-center bg-[#F4F4F0] gap-4 z-10 shrink-0">
                <div>
                  <h2 className="text-xl md:text-2xl font-black flex items-center gap-2 text-black mb-2">
@@ -1108,26 +1191,37 @@ export default function App() {
             </div>
             
             <div className="p-0 overflow-y-auto flex-1 bg-white custom-scrollbar">
-               <table className="w-full text-left border-collapse min-w-[600px]">
-                  <thead className="bg-[#EAEAEA] sticky top-0 z-10 shadow-sm">
-                    <tr className="border-b-[3px] border-[#1A1A1A]">
-                      <th className="p-3 md:p-4 font-black text-sm text-gray-700 uppercase">Liderança</th>
-                      <th className="p-3 md:p-4 font-black text-sm text-gray-700 uppercase">Localização / Situação</th>
-                      <th className="p-3 md:p-4 font-black text-sm text-gray-700 uppercase">Telefone</th>
-                      <th className="p-3 md:p-4 font-black text-sm text-gray-700 uppercase text-center">Ações</th>
+               <table className="w-full text-left border-collapse min-w-[800px]">
+                  <thead className="bg-[#EAEAEA] sticky top-0 z-10 shadow-sm border-b-[3px] border-[#1A1A1A]">
+                    <tr>
+                      <th className="p-3 md:p-4 font-black text-sm text-gray-700 uppercase cursor-pointer hover:bg-gray-200 select-none whitespace-nowrap" onClick={() => requestModalSort('lideranca')}>
+                        Liderança {getSortIcon('lideranca', modalSortConfig)}
+                      </th>
+                      <th className="p-3 md:p-4 font-black text-sm text-gray-700 uppercase cursor-pointer hover:bg-gray-200 select-none whitespace-nowrap" onClick={() => requestModalSort('municipio_bairro')}>
+                        Município / Bairro {getSortIcon('municipio_bairro', modalSortConfig)}
+                      </th>
+                      <th className="p-3 md:p-4 font-black text-sm text-gray-700 uppercase cursor-pointer hover:bg-gray-200 select-none whitespace-nowrap" onClick={() => requestModalSort('situacao')}>
+                        Situação {getSortIcon('situacao', modalSortConfig)}
+                      </th>
+                      <th className="p-3 md:p-4 font-black text-sm text-gray-700 uppercase cursor-pointer hover:bg-gray-200 select-none whitespace-nowrap" onClick={() => requestModalSort('telefone')}>
+                        Telefone {getSortIcon('telefone', modalSortConfig)}
+                      </th>
+                      <th className="p-3 md:p-4 font-black text-sm text-gray-700 uppercase text-center whitespace-nowrap">Ações</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {articuladorContacts.map(c => (
+                    {sortedModalContacts.map(c => (
                       <tr key={c.id} className="border-b-2 border-dashed border-gray-200 hover:bg-gray-50 transition-colors">
                          <td className="p-3 md:p-4">
                             <span className="font-bold text-sm md:text-base text-black block mb-1">{c.lideranca}</span>
                             {c.email && <span className="text-xs text-gray-500 font-semibold bg-gray-100 px-2 py-0.5 rounded flex items-center gap-1 w-fit"><Icon name="mail" size={10}/> {c.email}</span>}
                          </td>
                          <td className="p-3 md:p-4">
-                            <span className="text-xs md:text-sm font-bold text-gray-700 block mb-1">
-                               {c.municipio_bairro} {c.distrito ? `- ${c.distrito}` : ''}
+                            <span className="text-sm font-bold text-gray-700 block">
+                               {c.municipio_bairro || '-'} {c.distrito ? ` (${c.distrito})` : ''}
                             </span>
+                         </td>
+                         <td className="p-3 md:p-4">
                             <SituacaoBadge situacao={c.situacao} />
                          </td>
                          <td className="p-3 md:p-4">
@@ -1140,15 +1234,15 @@ export default function App() {
                          <td className="p-3 md:p-4 text-center">
                             <button 
                                onClick={() => { setSelectedArticuladorProfile(null); setSelectedContact(c); setIsEditMode(false); }} 
-                               className="text-xs font-bold px-3 py-1.5 bg-[#1A1A1A] text-white rounded hover:bg-[#DCAE1D] hover:text-[#1A1A1A] transition-colors shadow-sm"
+                               className="text-xs font-bold px-3 py-1.5 bg-[#1A1A1A] text-white rounded hover:bg-[#DCAE1D] hover:text-[#1A1A1A] transition-colors shadow-sm whitespace-nowrap"
                             >
                                Ver Ficha
                             </button>
                          </td>
                       </tr>
                     ))}
-                    {articuladorContacts.length === 0 && (
-                      <tr><td colSpan="4" className="p-8 text-center text-gray-500 font-bold">Nenhum registro encontrado.</td></tr>
+                    {sortedModalContacts.length === 0 && (
+                      <tr><td colSpan="5" className="p-8 text-center text-gray-500 font-bold">Nenhum registro encontrado.</td></tr>
                     )}
                   </tbody>
                </table>
@@ -1159,73 +1253,117 @@ export default function App() {
   };
 
   return (
-    <div className={`min-h-screen ${t.bgApp} p-3 sm:p-4 md:p-8 font-sans selection:bg-[#DCAE1D] selection:text-[#1A1A1A] transition-colors duration-300 overflow-x-hidden`}>
-      <style dangerouslySetInnerHTML={{__html: `
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap');
-        body { font-family: 'Inter', sans-serif; }
-        .animation-fade-in { animation: fadeIn 0.3s ease-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .shadow-mondrian { box-shadow: 5px 5px 0 0 var(--border-color); }
-        .shadow-mondrian-btn { box-shadow: 3px 3px 0 0 var(--border-color); }
-        .shadow-mondrian-btn:active:not(:disabled) { box-shadow: 0 0 0 0 transparent; transform: translate(3px, 3px); }
-        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background-color: var(--border-color); border-radius: 4px; }
-      `}} />
+    <>
+      <div className={`min-h-screen ${t.bgApp} p-3 sm:p-4 md:p-8 font-sans selection:bg-[#DCAE1D] selection:text-[#1A1A1A] transition-colors duration-300 overflow-x-hidden print:hidden`}>
+        <style dangerouslySetInnerHTML={{__html: `
+          @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap');
+          body { font-family: 'Inter', sans-serif; }
+          .animation-fade-in { animation: fadeIn 0.3s ease-out; }
+          @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+          .shadow-mondrian { box-shadow: 5px 5px 0 0 var(--border-color); }
+          .shadow-mondrian-btn { box-shadow: 3px 3px 0 0 var(--border-color); }
+          .shadow-mondrian-btn:active:not(:disabled) { box-shadow: 0 0 0 0 transparent; transform: translate(3px, 3px); }
+          .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+          .custom-scrollbar::-webkit-scrollbar-thumb { background-color: var(--border-color); border-radius: 4px; }
+        `}} />
 
-      <div className="max-w-6xl mx-auto">
-        <header className={`mb-6 md:mb-8 flex flex-col sm:flex-row sm:items-end justify-between border-b-[4px] ${t.border} pb-4 md:pb-6 gap-4 relative`}>
-          <div className="flex items-center gap-3 md:gap-4 relative z-10">
-            <div className={`w-12 h-12 md:w-16 md:h-16 flex items-center justify-center flex-shrink-0`}>
-              <img src="https://raw.githubusercontent.com/killuixo/tabulum-sig-maplid/refs/heads/main/icon-192.png" alt="Ícone TABULUM" className="w-full h-full object-contain drop-shadow-md rounded-xl" />
+        <div className="max-w-6xl mx-auto">
+          <header className={`mb-6 md:mb-8 flex flex-col sm:flex-row sm:items-end justify-between border-b-[4px] ${t.border} pb-4 md:pb-6 gap-4 relative`}>
+            <div className="flex items-center gap-3 md:gap-4 relative z-10">
+              <div className={`w-12 h-12 md:w-16 md:h-16 flex items-center justify-center flex-shrink-0`}>
+                <img src="https://raw.githubusercontent.com/killuixo/tabulum-sig-maplid/refs/heads/main/icon-192.png" alt="Ícone TABULUM" className="w-full h-full object-contain drop-shadow-md rounded-xl" />
+              </div>
+              <div>
+                <h1 className={`text-2xl md:text-4xl font-black uppercase tracking-tight ${t.text} leading-none`}>TABULUM</h1>
+                <p className="text-sm md:text-lg font-bold text-[#007577] mt-1">Mapa de Lideranças</p>
+              </div>
             </div>
-            <div>
-              <h1 className={`text-2xl md:text-4xl font-black uppercase tracking-tight ${t.text} leading-none`}>TABULUM</h1>
-              <p className="text-sm md:text-lg font-bold text-[#007577] mt-1">Mapa de Lideranças</p>
+            <div className="flex gap-2 relative z-10 self-start sm:self-auto ml-1 sm:ml-0 mt-2 sm:mt-0">
+              <span className={`h-3 w-3 md:h-4 md:w-4 rounded-sm border-[2px] ${t.border} bg-[#B32033]`}></span>
+              <span className={`h-3 w-3 md:h-4 md:w-4 rounded-sm border-[2px] ${t.border} bg-[#007577]`}></span>
+              <span className={`h-3 w-3 md:h-4 md:w-4 rounded-sm border-[2px] ${t.border} bg-[#DCAE1D]`}></span>
+            </div>
+          </header>
+
+          <nav className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 mb-6 md:mb-8">
+            <button onClick={() => setView('dashboard')} className={`${mondrianButton} ${view === 'dashboard' ? 'bg-[#DCAE1D] text-[#1A1A1A]' : `${t.cardBg} ${t.text}`}`}>
+              <Icon name="dashboard" size={20} /> <span className="truncate">Dashboard Analytics</span>
+            </button>
+            <button onClick={() => setView('directory')} className={`${mondrianButton} ${view === 'directory' ? 'bg-[#007577] text-white' : `${t.cardBg} ${t.text}`}`}>
+              <Icon name="directory" size={20} /> <span className="truncate">Diretório de Contatos</span>
+            </button>
+          </nav>
+
+          {renderGlobalFilters()}
+
+          <main>
+            {view === 'dashboard' && renderDashboard()}
+            {view === 'directory' && renderDirectory()}
+          </main>
+        </div>
+
+        {renderModal()}
+        {renderArticuladorModal()}
+        
+        {dialog && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animation-fade-in print:hidden">
+            <div className={`${mondrianCard} w-full max-w-sm p-6 text-center shadow-2xl`}>
+              <Icon name="alert" size={48} className={`mx-auto mb-4 ${dialog.type === 'confirm' ? 'text-[#DCAE1D]' : 'text-[#B32033]'}`} />
+              <p className={`font-bold text-lg mb-6 ${t.text}`}>{dialog.message}</p>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                {dialog.type === 'confirm' && (
+                  <button onClick={() => setDialog(null)} className={`${mondrianButton} ${t.inputBgAlt} ${t.text} flex-1`}>Cancelar</button>
+                )}
+                <button onClick={() => { if (dialog.onConfirm) dialog.onConfirm(); else setDialog(null); }} className={`${mondrianButton} ${dialog.type === 'confirm' ? 'bg-[#B32033]' : 'bg-[#007577]'} text-white flex-1`}>
+                  {dialog.type === 'confirm' ? 'Apagar' : 'OK'}
+                </button>
+              </div>
             </div>
           </div>
-          <div className="flex gap-2 relative z-10 self-start sm:self-auto ml-1 sm:ml-0 mt-2 sm:mt-0">
-            <span className={`h-3 w-3 md:h-4 md:w-4 rounded-sm border-[2px] ${t.border} bg-[#B32033]`}></span>
-            <span className={`h-3 w-3 md:h-4 md:w-4 rounded-sm border-[2px] ${t.border} bg-[#007577]`}></span>
-            <span className={`h-3 w-3 md:h-4 md:w-4 rounded-sm border-[2px] ${t.border} bg-[#DCAE1D]`}></span>
-          </div>
-        </header>
-
-        <nav className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 mb-6 md:mb-8">
-          <button onClick={() => setView('dashboard')} className={`${mondrianButton} ${view === 'dashboard' ? 'bg-[#DCAE1D] text-[#1A1A1A]' : `${t.cardBg} ${t.text}`}`}>
-            <Icon name="dashboard" size={20} /> <span className="truncate">Dashboard Analytics</span>
-          </button>
-          <button onClick={() => setView('directory')} className={`${mondrianButton} ${view === 'directory' ? 'bg-[#007577] text-white' : `${t.cardBg} ${t.text}`}`}>
-            <Icon name="directory" size={20} /> <span className="truncate">Diretório de Contatos</span>
-          </button>
-        </nav>
-
-        {renderGlobalFilters()}
-
-        <main>
-          {view === 'dashboard' && renderDashboard()}
-          {view === 'directory' && renderDirectory()}
-        </main>
+        )}
       </div>
 
-      {renderModal()}
-      {renderArticuladorModal()}
-      
-      {dialog && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animation-fade-in">
-          <div className={`${mondrianCard} w-full max-w-sm p-6 text-center shadow-2xl`}>
-            <Icon name="alert" size={48} className={`mx-auto mb-4 ${dialog.type === 'confirm' ? 'text-[#DCAE1D]' : 'text-[#B32033]'}`} />
-            <p className={`font-bold text-lg mb-6 ${t.text}`}>{dialog.message}</p>
-            <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              {dialog.type === 'confirm' && (
-                <button onClick={() => setDialog(null)} className={`${mondrianButton} ${t.inputBgAlt} ${t.text} flex-1`}>Cancelar</button>
-              )}
-              <button onClick={() => { if (dialog.onConfirm) dialog.onConfirm(); else setDialog(null); }} className={`${mondrianButton} ${dialog.type === 'confirm' ? 'bg-[#B32033]' : 'bg-[#007577]'} text-white flex-1`}>
-                {dialog.type === 'confirm' ? 'Apagar' : 'OK'}
-              </button>
-            </div>
+      {/* TELA DE IMPRESSÃO - ATIVADA SOMENTE AO CLICAR EM PDF */}
+      <div className="hidden print:block p-8 bg-white text-black font-sans w-full max-w-[100%] mx-auto">
+        <div className="border-b-4 border-black pb-4 mb-8 flex justify-between items-end">
+          <div>
+            <h1 className="text-3xl font-black uppercase tracking-tight">TABULUM</h1>
+            <p className="text-lg font-bold text-gray-700 mt-1">Relatório de Lideranças - Base Pré-Campanha</p>
+          </div>
+          <div className="text-right">
+             <p className="text-sm font-bold text-gray-500">Contatos Listados: <span className="text-black">{sortedContacts.length}</span></p>
+             <p className="text-xs font-semibold text-gray-500">Impresso em: {new Date().toLocaleDateString('pt-BR')} {new Date().toLocaleTimeString('pt-BR')}</p>
           </div>
         </div>
-      )}
-    </div>
+
+        <table className="w-full text-left border-collapse text-xs">
+          <thead>
+            <tr className="bg-gray-100 border-y-2 border-black">
+              <th className="p-2 font-black uppercase w-[20%]">Liderança</th>
+              <th className="p-2 font-black uppercase w-[15%]">Localização</th>
+              <th className="p-2 font-black uppercase w-[15%]">Tema</th>
+              <th className="p-2 font-black uppercase w-[15%]">Situação</th>
+              <th className="p-2 font-black uppercase w-[15%]">Articulador</th>
+              <th className="p-2 font-black uppercase w-[20%]">Telefone</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sortedContacts.map((contact, index) => (
+              <tr key={contact.id} className={`border-b border-gray-300 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
+                <td className="p-2 font-bold">{contact.lideranca}</td>
+                <td className="p-2 text-gray-700">{contact.municipio_bairro || '-'} {contact.distrito ? `(${contact.distrito})` : ''}</td>
+                <td className="p-2 text-gray-700 truncate max-w-[150px]">{contact.temas || '-'}</td>
+                <td className="p-2 font-semibold">{contact.situacao || '-'}</td>
+                <td className="p-2 font-bold text-gray-700">{contact.articulador || '-'}</td>
+                <td className="p-2 font-mono text-gray-900">{contact.telefone || 'S/ Número'}</td>
+              </tr>
+            ))}
+            {sortedContacts.length === 0 && (
+              <tr><td colSpan="6" className="p-6 text-center text-gray-500 font-bold text-sm">Nenhum dado encontrado com os filtros atuais.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </>
   );
 }
