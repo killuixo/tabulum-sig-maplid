@@ -28,7 +28,8 @@ const Icon = ({ name, size = 24, className = "" }) => {
     edit: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7 M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />,
     trash: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />,
     save: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />,
-    filter: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+    filter: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />,
+    download: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
   };
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" className={className}>
@@ -66,7 +67,6 @@ export default function App() {
   const [contacts, setContacts] = useState(INITIAL_MOCK_DATA);
   const [selectedContact, setSelectedContact] = useState(null);
   
-  // Controle do modal da Assessoria/Articulador
   const [selectedArticuladorProfile, setSelectedArticuladorProfile] = useState(null);
 
   const [isEditMode, setIsEditMode] = useState(false);
@@ -76,7 +76,6 @@ export default function App() {
   const [mapScope, setMapScope] = useState('SC');
   const [directoryViewMode, setDirectoryViewMode] = useState('grid');
   
-  // Novos controles de Filtro Recolhível e Busca
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterPhoneStatus, setFilterPhoneStatus] = useState('Todos');
@@ -232,7 +231,6 @@ export default function App() {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  // Trava de segurança para evitar tela branca ao buscar números de telefone/situação
   const safeLower = (val) => (val != null ? String(val).toLowerCase() : '');
 
   const filteredContacts = useMemo(() => {
@@ -244,11 +242,9 @@ export default function App() {
       const matchesTemas = filterTemas.length === 0 || filterTemas.includes(contact.temas);
       const matchesSituacao = filterSituacao.length === 0 || filterSituacao.includes(contact.situacao);
 
-      // Filtro de Status do Telefone
       const hasPhone = contact.telefone && String(contact.telefone).trim() !== '';
       const matchesPhoneStatus = filterPhoneStatus === 'Todos' ? true : (filterPhoneStatus === 'Com Telefone' ? hasPhone : !hasPhone);
 
-      // Busca Universal Segura (Texto + Números)
       const nomeMatch = safeLower(contact.lideranca).includes(lowerSearch);
       const localMatch = safeLower(contact.municipio_bairro).includes(lowerSearch);
       const areaMatch = safeLower(contact.area_de_atuacao).includes(lowerSearch);
@@ -272,6 +268,52 @@ export default function App() {
       return matchesBase && matchesArticulador && matchesTemas && matchesSituacao && matchesPhoneStatus && matchesSearch && flnMatch && scMatch;
     });
   }, [contacts, filterBase, filterArticulador, filterTemas, filterSituacao, filterPhoneStatus, searchTerm, filterDistritoFln, filterBairroFln, filterRegiaoSc, filterMunicipioSc]);
+
+  const handleExportCSV = () => {
+    if (filteredContacts.length === 0) {
+      setDialog({ type: 'alert', message: "Não há contatos filtrados para exportar." });
+      return;
+    }
+
+    const headers = [
+      "Nome (Liderança)", "Base", "Localização (Município/Bairro)", 
+      "Região", "Distrito", "Situação", "Área de Atuação", 
+      "Temas", "Tema Institucional", "Articulador", "Telefone", "E-mail", "Observações"
+    ];
+
+    const csvRows = [headers.join(",")];
+
+    for (const c of filteredContacts) {
+      const row = [
+        c.lideranca, c.base, c.municipio_bairro, 
+        c.regiao, c.distrito, c.situacao, c.area_de_atuacao, 
+        c.temas, c.tema_institucional, c.articulador, c.telefone, c.email, c.observacoes
+      ].map(value => {
+        if (value === null || value === undefined) return '""';
+        let str = String(value);
+        // Protege contra aspas duplas no texto para nao quebrar a coluna do CSV
+        str = str.replace(/"/g, '""');
+        // Se a string tem virgula, quebra de linha ou aspas, precisamos encapsular tudo em aspas duplas
+        if (str.search(/("|,|\n)/g) >= 0) {
+          str = `"${str}"`;
+        }
+        return str;
+      });
+      csvRows.push(row.join(","));
+    }
+
+    const csvString = csvRows.join("\n");
+    // Adiciona o BOM para o Excel ou Sheets decodificarem os acentos (utf-8) corretamente.
+    const blob = new Blob(["\ufeff" + csvString], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `Contatos_Filtrados_${new Date().toISOString().slice(0,10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   const stats = useMemo(() => {
     const floripaCount = filteredContacts.filter(c => c.base === 'Base Florianópolis').length;
@@ -747,6 +789,11 @@ export default function App() {
               <Icon name="list" size={20} />
             </button>
           </div>
+          
+          <button onClick={handleExportCSV} className={`${mondrianButton} ${t.inputBgAlt} ${t.text} hover:-translate-y-1 w-full sm:w-auto`}>
+            <Icon name="download" size={20} /> Exportar CSV
+          </button>
+          
           <button onClick={openNewContactModal} className={`${mondrianButton} bg-[#007577] text-white hover:-translate-y-1 w-full sm:w-auto`}>
             <Icon name="plus" size={20} /> Adicionar
           </button>
@@ -1036,7 +1083,6 @@ export default function App() {
   const renderArticuladorModal = () => {
     if (!selectedArticuladorProfile) return null;
     
-    // Todos os contatos da base correspondentes àquela assessoria
     const articuladorContacts = contacts.filter(c => c.articulador === selectedArticuladorProfile);
     const withPhone = articuladorContacts.filter(c => c.telefone && String(c.telefone).trim() !== '').length;
     const withoutPhone = articuladorContacts.length - withPhone;
@@ -1044,7 +1090,6 @@ export default function App() {
     return (
       <div className="fixed inset-0 z-[60] flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-sm animation-fade-in">
          <div className={`${mondrianCard} w-full max-w-4xl max-h-[95vh] overflow-hidden relative flex flex-col`}>
-            {/* Header Fixo */}
             <div className="p-4 md:p-6 border-b-[3px] border-[#1A1A1A] flex flex-col md:flex-row justify-between items-start md:items-center bg-[#F4F4F0] gap-4 z-10 shrink-0">
                <div>
                  <h2 className="text-xl md:text-2xl font-black flex items-center gap-2 text-black mb-2">
@@ -1062,7 +1107,6 @@ export default function App() {
                </button>
             </div>
             
-            {/* Lista com rolagem livre */}
             <div className="p-0 overflow-y-auto flex-1 bg-white custom-scrollbar">
                <table className="w-full text-left border-collapse min-w-[600px]">
                   <thead className="bg-[#EAEAEA] sticky top-0 z-10 shadow-sm">
