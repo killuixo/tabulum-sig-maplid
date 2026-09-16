@@ -76,7 +76,7 @@ export default function App() {
   const [mapScope, setMapScope] = useState('SC');
   const [directoryViewMode, setDirectoryViewMode] = useState('grid');
   
-  // Novos controles de Filtro
+  // Novos controles de Filtro Recolhível e Busca
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterPhoneStatus, setFilterPhoneStatus] = useState('Todos');
@@ -379,7 +379,6 @@ export default function App() {
   const SituacaoBadge = ({ situacao }) => {
     if (!situacao) return null;
     let cor = "bg-gray-200 text-[#1A1A1A]";
-    // Conversão segura de situação para string antes de checar inclusão
     if (String(situacao).includes("4 -")) cor = "bg-[#007577] text-white";
     else if (String(situacao).includes("3 -")) cor = "bg-[#DCAE1D] text-[#1A1A1A]";
     else if (String(situacao).includes("1 -") || String(situacao).includes("2 -")) cor = "bg-[#B32033] text-white";
@@ -775,7 +774,7 @@ export default function App() {
                       </div>
                       <SituacaoBadge situacao={contact.situacao} />
                     </div>
-                    {/* Articuladores interativos que abrem ficha da assessoria */}
+                    {/* Botão interativo do Articulador no Grid */}
                     <div className={`mt-auto pt-4 border-t-2 border-dashed border-gray-300 flex flex-wrap gap-2 items-center justify-between`}>
                       <div className="flex flex-col gap-1.5 max-w-[70%]">
                         <span className={`text-[10px] md:text-xs font-bold truncate ${t.textMuted}`}><Icon name="tag" size={12} className="inline mr-1"/>{contact.temas || 'S/ Tema'}</span>
@@ -816,6 +815,7 @@ export default function App() {
                   <div className="md:px-4 md:py-4 md:w-48 shrink-0 flex items-center">
                     <SituacaoBadge situacao={contact.situacao} />
                   </div>
+                  {/* Botão interativo do Articulador na Lista */}
                   {contact.articulador && (
                     <div className="md:px-4 md:py-4 md:w-48 shrink-0 hidden md:block border-l-2 border-dashed border-gray-300">
                        <span className={`text-[10px] md:text-xs font-bold truncate block ${t.textMuted}`}>Articulador</span>
