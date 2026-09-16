@@ -27,7 +27,8 @@ const Icon = ({ name, size = 24, className = "" }) => {
     plus: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />,
     edit: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7 M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />,
     trash: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />,
-    save: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+    save: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />,
+    filter: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
   };
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" className={className}>
@@ -38,8 +39,6 @@ const Icon = ({ name, size = 24, className = "" }) => {
 
 const INITIAL_MOCK_DATA = [];
 
-// Coordenadas REAIS (Longitude e Latitude) para os bairros da grande florianópolis
-// Agora o mapa base filtrará EXATAMENTE o polígono de Florianópolis
 const MAP_COORDINATES = {
   FLN: {
     "Centro": [-48.548, -27.595],
@@ -66,6 +65,10 @@ export default function App() {
   const [view, setView] = useState('dashboard');
   const [contacts, setContacts] = useState(INITIAL_MOCK_DATA);
   const [selectedContact, setSelectedContact] = useState(null);
+  
+  // Novo modal de Articulador (Assessoria)
+  const [selectedArticuladorProfile, setSelectedArticuladorProfile] = useState(null);
+
   const [isEditMode, setIsEditMode] = useState(false);
   const [formData, setFormData] = useState({});
   const [dialog, setDialog] = useState(null); 
@@ -73,7 +76,11 @@ export default function App() {
   const [mapScope, setMapScope] = useState('SC');
   const [directoryViewMode, setDirectoryViewMode] = useState('grid');
   
+  // Filtros Globais e Visibilidade
+  const [isFiltersOpen, setIsFiltersOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterPhoneStatus, setFilterPhoneStatus] = useState('Todos'); // 'Todos', 'Com Telefone', 'Sem Telefone'
+  
   const [filterBase, setFilterBase] = useState([]);
   const [filterTemas, setFilterTemas] = useState([]);
   const [filterSituacao, setFilterSituacao] = useState([]);
@@ -103,7 +110,6 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    // Variável CSS de borda fixa, já que não há mais modo escuro
     document.documentElement.style.setProperty('--border-color', '#1A1A1A');
   }, []);
 
@@ -228,16 +234,27 @@ export default function App() {
 
   const filteredContacts = useMemo(() => {
     return contacts.filter(contact => {
+      // Filtros MultiSelect
       const matchesBase = filterBase.length === 0 || filterBase.includes(contact.base);
       const matchesArticulador = filterArticulador.length === 0 || filterArticulador.includes(contact.articulador);
       const matchesTemas = filterTemas.length === 0 || filterTemas.includes(contact.temas);
       const matchesSituacao = filterSituacao.length === 0 || filterSituacao.includes(contact.situacao);
 
+      // Status do Telefone
+      const hasPhone = !!contact.telefone && contact.telefone.trim() !== '';
+      const matchesPhoneStatus = filterPhoneStatus === 'Todos' ? true : (filterPhoneStatus === 'Com Telefone' ? hasPhone : !hasPhone);
+
+      // Busca Universal (Nome, Local, Área, Telefone, Email, Articulador)
       const nomeMatch = contact.lideranca?.toLowerCase().includes(searchTerm.toLowerCase());
       const localMatch = contact.municipio_bairro?.toLowerCase().includes(searchTerm.toLowerCase());
       const areaMatch = contact.area_de_atuacao?.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesSearch = !searchTerm || nomeMatch || localMatch || areaMatch;
+      const phoneMatch = contact.telefone?.toLowerCase().includes(searchTerm.toLowerCase());
+      const emailMatch = contact.email?.toLowerCase().includes(searchTerm.toLowerCase());
+      const artMatch = contact.articulador?.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const matchesSearch = !searchTerm || nomeMatch || localMatch || areaMatch || phoneMatch || emailMatch || artMatch;
 
+      // Filtros Regionais
       const isFln = contact.base === 'Base Florianópolis';
       const isSc = contact.base === 'Base Santa Catarina';
       
@@ -249,9 +266,9 @@ export default function App() {
       const matchesMuni = filterMunicipioSc.length === 0 || filterMunicipioSc.includes(contact.municipio_bairro);
       const scMatch = !isSc || (matchesRegiao && matchesMuni);
 
-      return matchesBase && matchesArticulador && matchesTemas && matchesSituacao && matchesSearch && flnMatch && scMatch;
+      return matchesBase && matchesArticulador && matchesTemas && matchesSituacao && matchesPhoneStatus && matchesSearch && flnMatch && scMatch;
     });
-  }, [contacts, filterBase, filterArticulador, filterTemas, filterSituacao, searchTerm, filterDistritoFln, filterBairroFln, filterRegiaoSc, filterMunicipioSc]);
+  }, [contacts, filterBase, filterArticulador, filterTemas, filterSituacao, filterPhoneStatus, searchTerm, filterDistritoFln, filterBairroFln, filterRegiaoSc, filterMunicipioSc]);
 
   const stats = useMemo(() => {
     const floripaCount = filteredContacts.filter(c => c.base === 'Base Florianópolis').length;
@@ -285,16 +302,10 @@ export default function App() {
     const map = {};
     filteredContacts.forEach(c => {
       if (c.base !== 'Base Florianópolis') return;
-      
-      // Agrupa por distrito primariamente se existir, senão bairro, para plotar bolhas de forma mais agregada se desejar,
-      // mas vamos usar o município_bairro ou distrito conforme disponível no MAP_COORDINATES
       let locName = c.distrito || c.municipio_bairro; 
-      
-      // Ajuste para encontrar a chave correta no MAP_COORDINATES.FLN
       if (!MAP_COORDINATES.FLN[locName] && c.municipio_bairro && MAP_COORDINATES.FLN[c.municipio_bairro]) {
          locName = c.municipio_bairro;
       }
-      
       if(locName) map[locName] = (map[locName] || 0) + 1;
     });
     return map;
@@ -373,35 +384,56 @@ export default function App() {
   };
 
   const renderGlobalFilters = () => (
-    <div className={`${mondrianCard} p-4 md:p-6 mb-6 flex flex-col gap-4 bg-[#F4F4F0]`}>
-      <div className="flex flex-col md:flex-row gap-4 items-end flex-wrap">
-        <div className="w-full md:w-64 flex flex-col gap-1.5 shrink-0">
-          <label className={`font-bold text-xs md:text-sm uppercase tracking-wide ${t.textMuted}`}>Buscar</label>
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-500"><Icon name="search" size={20} /></div>
-            <input type="text" placeholder="Nome, área..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className={`w-full pl-10 pr-3 py-2.5 rounded-lg border-[3px] ${t.border} focus:outline-none focus:ring-2 focus:ring-[#B32033] font-bold ${t.inputBg} ${t.text} shadow-sm`} />
-          </div>
-        </div>
-        
-        <MultiSelectFilter label="Base" options={bases} selected={filterBase} onChange={setFilterBase} />
-        <MultiSelectFilter label="Tema" options={temasExtraidos} selected={filterTemas} onChange={setFilterTemas} />
-        <MultiSelectFilter label="Situação" options={situacoesExtraidas} selected={filterSituacao} onChange={setFilterSituacao} />
-        <MultiSelectFilter label="Articulador" options={articuladoresExtraidos} selected={filterArticulador} onChange={setFilterArticulador} />
-      </div>
+    <div className={`${mondrianCard} mb-6 flex flex-col bg-[#F4F4F0] overflow-hidden transition-all duration-300`}>
+      <button 
+        onClick={() => setIsFiltersOpen(!isFiltersOpen)} 
+        className={`w-full p-4 md:p-5 flex justify-between items-center bg-white font-black text-base md:text-xl ${t.text} hover:bg-gray-50 transition-colors ${isFiltersOpen ? `border-b-[3px] border-dashed ${t.border}` : ''}`}
+      >
+        <div className="flex items-center gap-3"><Icon name="filter" size={24} className="text-[#B32033]" /> Central de Filtros e Buscas</div>
+        <Icon name="chevronright" size={24} className={`transform transition-transform ${isFiltersOpen ? 'rotate-90 text-[#B32033]' : 'text-gray-400'}`} />
+      </button>
 
-      {(filterBase.length === 0 || filterBase.includes('Base Florianópolis') || filterBase.includes('Base Santa Catarina')) && (
-        <div className={`flex flex-col md:flex-row gap-4 items-end flex-wrap pt-2 mt-2 border-t-[3px] border-dashed ${t.border}`}>
-          {(filterBase.length === 0 || filterBase.includes('Base Florianópolis')) && (
-            <>
-              <MultiSelectFilter label="Distrito (Floripa)" options={distritosExtraidos} selected={filterDistritoFln} onChange={setFilterDistritoFln} />
-              <MultiSelectFilter label="Bairro (Floripa)" options={bairrosExtraidos} selected={filterBairroFln} onChange={setFilterBairroFln} />
-            </>
-          )}
-          {(filterBase.length === 0 || filterBase.includes('Base Santa Catarina')) && (
-            <>
-              <MultiSelectFilter label="Região (SC)" options={regioesExtraidas} selected={filterRegiaoSc} onChange={setFilterRegiaoSc} />
-              <MultiSelectFilter label="Município (SC)" options={municipiosExtraidos} selected={filterMunicipioSc} onChange={setFilterMunicipioSc} />
-            </>
+      {isFiltersOpen && (
+        <div className="p-4 md:p-6 flex flex-col gap-4 animation-fade-in">
+          <div className="flex flex-col md:flex-row gap-4 items-end flex-wrap">
+            <div className="w-full md:w-64 flex flex-col gap-1.5 shrink-0">
+              <label className={`font-bold text-xs md:text-sm uppercase tracking-wide ${t.textMuted}`}>Busca Universal</label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-500"><Icon name="search" size={20} /></div>
+                <input type="text" placeholder="Nome, tel, email, assessoria..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className={`w-full pl-10 pr-3 py-2.5 rounded-lg border-[3px] ${t.border} focus:outline-none focus:ring-2 focus:ring-[#B32033] font-bold ${t.inputBg} ${t.text} shadow-sm`} />
+              </div>
+            </div>
+            
+            <div className="w-full md:w-48 flex flex-col gap-1.5 shrink-0">
+              <label className={`font-bold text-xs md:text-sm uppercase tracking-wide ${t.textMuted}`}>Telefone</label>
+              <select value={filterPhoneStatus} onChange={(e) => setFilterPhoneStatus(e.target.value)} className={`w-full px-3 py-2.5 rounded-lg border-[3px] ${t.border} font-bold ${t.inputBg} ${t.text} focus:outline-none focus:ring-2 focus:ring-[#B32033] shadow-sm`}>
+                <option value="Todos">Todas Lideranças</option>
+                <option value="Com Telefone">Apenas COM número</option>
+                <option value="Sem Telefone">Apenas SEM número</option>
+              </select>
+            </div>
+
+            <MultiSelectFilter label="Assessoria/Articulador" options={articuladoresExtraidos} selected={filterArticulador} onChange={setFilterArticulador} />
+            <MultiSelectFilter label="Base" options={bases} selected={filterBase} onChange={setFilterBase} />
+            <MultiSelectFilter label="Tema" options={temasExtraidos} selected={filterTemas} onChange={setFilterTemas} />
+            <MultiSelectFilter label="Situação" options={situacoesExtraidas} selected={filterSituacao} onChange={setFilterSituacao} />
+          </div>
+
+          {(filterBase.length === 0 || filterBase.includes('Base Florianópolis') || filterBase.includes('Base Santa Catarina')) && (
+            <div className={`flex flex-col md:flex-row gap-4 items-end flex-wrap pt-2 mt-2 border-t-[3px] border-dashed ${t.border}`}>
+              {(filterBase.length === 0 || filterBase.includes('Base Florianópolis')) && (
+                <>
+                  <MultiSelectFilter label="Distrito (Floripa)" options={distritosExtraidos} selected={filterDistritoFln} onChange={setFilterDistritoFln} />
+                  <MultiSelectFilter label="Bairro (Floripa)" options={bairrosExtraidos} selected={filterBairroFln} onChange={setFilterBairroFln} />
+                </>
+              )}
+              {(filterBase.length === 0 || filterBase.includes('Base Santa Catarina')) && (
+                <>
+                  <MultiSelectFilter label="Região (SC)" options={regioesExtraidas} selected={filterRegiaoSc} onChange={setFilterRegiaoSc} />
+                  <MultiSelectFilter label="Município (SC)" options={municipiosExtraidos} selected={filterMunicipioSc} onChange={setFilterMunicipioSc} />
+                </>
+              )}
+            </div>
           )}
         </div>
       )}
@@ -411,9 +443,6 @@ export default function App() {
   const renderRealMapSVG = () => {
     if (!mapGeoJson) return <div className="p-8 text-center font-bold">Carregando Mapa Real...</div>;
 
-    // A correção principal do Mapa de Florianópolis: 
-    // Filtrar EXATAMENTE a string "Florianópolis" quando o mapScope for 'FLN'.
-    // Isso cria um bounding box perfeito apenas para a ilha e a parte continental de Floripa.
     const featuresToRender = mapGeoJson.features.filter(f =>
       mapScope === 'SC' ? true : f.properties.name === "Florianópolis"
     );
@@ -530,7 +559,6 @@ export default function App() {
               );
             })}
 
-            {/* Renderização das bolhas para Florianópolis usando coordenadas estritas do GeoJSON */}
             {mapScope === 'FLN' && Object.entries(contatosPorBairro).map(([bairro, count], i) => {
                 const coords = MAP_COORDINATES.FLN[bairro];
                 if (!coords) return null;
@@ -743,12 +771,20 @@ export default function App() {
                       </div>
                       <SituacaoBadge situacao={contact.situacao} />
                     </div>
-                    {/* Articuladores explícitos com texto preto sólido */}
+                    
                     <div className={`mt-auto pt-4 border-t-2 border-dashed border-gray-300 flex flex-wrap gap-2 items-center justify-between`}>
                       <div className="flex flex-col gap-1.5 max-w-[70%]">
-                        <span className={`text-[10px] md:text-xs font-bold truncate ${t.textMuted}`}><Icon name="tag" size={12} className="inline mr-1"/>{contact.temas || 'S/ Tema'}</span>
+                        <span className={`text-[10px] md:text-xs font-bold truncate ${t.textMuted}`}>
+                          <Icon name="tag" size={12} className="inline mr-1"/>{contact.temas || 'S/ Tema'}
+                        </span>
                         {contact.articulador && (
-                          <span className={`text-[10px] md:text-xs font-black truncate text-black`}><Icon name="usercheck" size={12} className="inline mr-1"/>{contact.articulador}</span>
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); setSelectedArticuladorProfile(contact.articulador); }} 
+                            className={`text-[10px] md:text-xs font-black truncate text-[#007577] hover:underline bg-[#EAEAEA] px-1.5 py-0.5 rounded border border-gray-300 flex items-center w-fit max-w-full`}
+                            title="Ver dashboard desta assessoria"
+                          >
+                            <Icon name="usercheck" size={12} className="inline mr-1 shrink-0"/> <span className="truncate">{contact.articulador}</span>
+                          </button>
                         )}
                       </div>
                       <button className={`p-2 ${t.inputBgAlt} border-[2px] ${t.border} rounded-md hover:bg-[#B32033] hover:text-white transition-colors shrink-0 ${t.text}`}><Icon name="chevronright" size={16} /></button>
@@ -779,14 +815,18 @@ export default function App() {
                     <SituacaoBadge situacao={contact.situacao} />
                   </div>
                   {contact.articulador && (
-                    <div className="md:px-4 md:py-4 md:w-40 shrink-0 hidden md:block border-l-2 border-dashed border-gray-300">
+                    <div className="md:px-4 md:py-4 md:w-48 shrink-0 hidden md:block border-l-2 border-dashed border-gray-300">
                        <span className={`text-[10px] md:text-xs font-bold truncate block ${t.textMuted}`}>Articulador</span>
-                       <span className={`text-xs font-black truncate flex items-center gap-1 text-black`}>
-                          <Icon name="usercheck" size={14} className="text-[#007577]" /> {contact.articulador}
-                       </span>
+                       <button 
+                          onClick={(e) => { e.stopPropagation(); setSelectedArticuladorProfile(contact.articulador); }} 
+                          className={`text-xs font-black truncate flex items-center gap-1 text-[#007577] hover:underline bg-[#EAEAEA] px-1.5 py-0.5 rounded border border-gray-300 w-full`}
+                          title="Ver dashboard desta assessoria"
+                       >
+                          <Icon name="usercheck" size={14} className="shrink-0" /> <span className="truncate">{contact.articulador}</span>
+                       </button>
                     </div>
                   )}
-                  <div className="md:px-4 md:py-4 shrink-0 hidden md:flex items-center justify-center ml-auto">
+                  <div className="md:px-4 md:py-4 shrink-0 hidden md:flex items-center justify-center ml-auto border-l-2 border-dashed border-gray-300">
                      <button className={`p-2 ${t.inputBgAlt} border-[2px] ${t.border} rounded-md hover:bg-[#B32033] hover:text-white transition-colors ${t.text}`}><Icon name="chevronright" size={16} /></button>
                   </div>
                 </div>
@@ -941,7 +981,14 @@ export default function App() {
                     </div>
                     <div>
                       <label className="text-[10px] md:text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">Telefone</label>
-                      <p className={`font-bold flex items-center gap-2 text-sm md:text-base break-all ${t.text}`}><span className="text-[#DCAE1D] shrink-0"><Icon name="phone" size={16}/></span> {selectedContact.telefone || 'N/A'}</p>
+                      <p className={`font-bold flex items-center gap-2 text-sm md:text-base break-all ${t.text}`}>
+                        <span className="text-[#DCAE1D] shrink-0"><Icon name="phone" size={16}/></span> 
+                        {selectedContact.telefone ? (
+                          <span>{selectedContact.telefone}</span>
+                        ) : (
+                          <span className="text-[#B32033] bg-[#B32033]/10 px-2 py-0.5 rounded">Sem Telefone</span>
+                        )}
+                      </p>
                     </div>
                     <div>
                       <label className="text-[10px] md:text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">E-mail</label>
@@ -951,10 +998,13 @@ export default function App() {
                   <div className="space-y-4">
                     {selectedContact.articulador && (
                       <div>
-                        <label className="text-[10px] md:text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">Articulador(a)</label>
-                        <p className={`font-bold flex items-center gap-2 text-base md:text-lg text-black`}>
-                          <span className="text-[#B32033] shrink-0"><Icon name="usercheck" size={18} /></span> {selectedContact.articulador}
-                        </p>
+                        <label className="text-[10px] md:text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">Articulador(a) / Assessoria</label>
+                        <button 
+                          onClick={() => { setSelectedContact(null); setSelectedArticuladorProfile(selectedContact.articulador); }} 
+                          className={`font-bold flex items-center gap-2 text-base md:text-lg text-[#007577] hover:underline bg-[#EAEAEA] px-2 py-1 rounded-md border border-gray-300 w-fit transition-colors`}
+                        >
+                          <span className="shrink-0"><Icon name="usercheck" size={18} /></span> {selectedContact.articulador}
+                        </button>
                       </div>
                     )}
                     <div>
@@ -979,6 +1029,87 @@ export default function App() {
         </div>
       </div>
     );
+  };
+
+  const renderArticuladorModal = () => {
+    if (!selectedArticuladorProfile) return null;
+    
+    // Todos os contatos da base correspondentes àquela assessoria
+    const articuladorContacts = contacts.filter(c => c.articulador === selectedArticuladorProfile);
+    const withPhone = articuladorContacts.filter(c => c.telefone && c.telefone.trim() !== '').length;
+    const withoutPhone = articuladorContacts.length - withPhone;
+
+    return (
+      <div className="fixed inset-0 z-[60] flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-sm animation-fade-in">
+         <div className={`${mondrianCard} w-full max-w-4xl max-h-[95vh] overflow-hidden relative flex flex-col`}>
+            {/* Header Fixo */}
+            <div className="p-4 md:p-6 border-b-[3px] border-[#1A1A1A] flex flex-col md:flex-row justify-between items-start md:items-center bg-[#F4F4F0] gap-4 z-10 shrink-0">
+               <div>
+                 <h2 className="text-xl md:text-2xl font-black flex items-center gap-2 text-black mb-2">
+                   <Icon name="usercheck" size={28} className="text-[#007577]" /> 
+                   Assessoria: {selectedArticuladorProfile}
+                 </h2>
+                 <div className="flex gap-4 text-xs md:text-sm font-bold bg-white p-2 rounded-lg border-[2px] border-[#1A1A1A] w-fit shadow-sm">
+                    <span className="text-gray-600">Total Indicados: <span className="text-black font-black text-base">{articuladorContacts.length}</span></span>
+                    <span className="text-gray-600 border-l-2 border-gray-300 pl-4">Com Número: <span className="text-[#007577] font-black text-base">{withPhone}</span></span>
+                    <span className="text-gray-600 border-l-2 border-gray-300 pl-4">Sem Número: <span className="text-[#B32033] font-black text-base">{withoutPhone}</span></span>
+                 </div>
+               </div>
+               <button onClick={() => setSelectedArticuladorProfile(null)} className={`p-2 border-[3px] ${t.border} rounded-xl hover:bg-[#B32033] hover:text-white transition-colors shadow-mondrian-btn bg-white shrink-0 absolute top-4 right-4 md:relative md:top-auto md:right-auto`} title="Fechar Painel">
+                 <Icon name="x" size={24} />
+               </button>
+            </div>
+            
+            {/* Lista com rolagem livre */}
+            <div className="p-0 overflow-y-auto flex-1 bg-white custom-scrollbar">
+               <table className="w-full text-left border-collapse min-w-[600px]">
+                  <thead className="bg-[#EAEAEA] sticky top-0 z-10 shadow-sm">
+                    <tr className="border-b-[3px] border-[#1A1A1A]">
+                      <th className="p-3 md:p-4 font-black text-sm text-gray-700 uppercase">Liderança</th>
+                      <th className="p-3 md:p-4 font-black text-sm text-gray-700 uppercase">Localização / Situação</th>
+                      <th className="p-3 md:p-4 font-black text-sm text-gray-700 uppercase">Telefone</th>
+                      <th className="p-3 md:p-4 font-black text-sm text-gray-700 uppercase text-center">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {articuladorContacts.map(c => (
+                      <tr key={c.id} className="border-b-2 border-dashed border-gray-200 hover:bg-gray-50 transition-colors">
+                         <td className="p-3 md:p-4">
+                            <span className="font-bold text-sm md:text-base text-black block mb-1">{c.lideranca}</span>
+                            {c.email && <span className="text-xs text-gray-500 font-semibold bg-gray-100 px-2 py-0.5 rounded flex items-center gap-1 w-fit"><Icon name="mail" size={10}/> {c.email}</span>}
+                         </td>
+                         <td className="p-3 md:p-4">
+                            <span className="text-xs md:text-sm font-bold text-gray-700 block mb-1">
+                               {c.municipio_bairro} {c.distrito ? `- ${c.distrito}` : ''}
+                            </span>
+                            <SituacaoBadge situacao={c.situacao} />
+                         </td>
+                         <td className="p-3 md:p-4">
+                            {c.telefone && c.telefone.trim() !== '' ? (
+                               <span className="font-black text-sm text-[#007577] bg-[#007577]/10 border border-[#007577]/20 px-2 py-1 rounded block w-fit">{c.telefone}</span>
+                            ) : (
+                               <span className="font-black text-xs text-[#B32033] bg-[#B32033]/10 border border-[#B32033]/20 px-2 py-1 rounded block w-fit">Sem Número Cadastrado</span>
+                            )}
+                         </td>
+                         <td className="p-3 md:p-4 text-center">
+                            <button 
+                               onClick={() => { setSelectedArticuladorProfile(null); setSelectedContact(c); setIsEditMode(false); }} 
+                               className="text-xs font-bold px-3 py-1.5 bg-[#1A1A1A] text-white rounded hover:bg-[#DCAE1D] hover:text-[#1A1A1A] transition-colors shadow-sm"
+                            >
+                               Ver Ficha
+                            </button>
+                         </td>
+                      </tr>
+                    ))}
+                    {articuladorContacts.length === 0 && (
+                      <tr><td colSpan="4" className="p-8 text-center text-gray-500 font-bold">Nenhum registro encontrado.</td></tr>
+                    )}
+                  </tbody>
+               </table>
+            </div>
+         </div>
+      </div>
+    )
   };
 
   return (
@@ -1015,10 +1146,10 @@ export default function App() {
 
         <nav className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 mb-6 md:mb-8">
           <button onClick={() => setView('dashboard')} className={`${mondrianButton} ${view === 'dashboard' ? 'bg-[#DCAE1D] text-[#1A1A1A]' : `${t.cardBg} ${t.text}`}`}>
-            <Icon name="dashboard" size={20} /> <span className="truncate">Dashboard</span>
+            <Icon name="dashboard" size={20} /> <span className="truncate">Dashboard Analytics</span>
           </button>
           <button onClick={() => setView('directory')} className={`${mondrianButton} ${view === 'directory' ? 'bg-[#007577] text-white' : `${t.cardBg} ${t.text}`}`}>
-            <Icon name="directory" size={20} /> <span className="truncate">Diretório</span>
+            <Icon name="directory" size={20} /> <span className="truncate">Diretório de Contatos</span>
           </button>
         </nav>
 
@@ -1030,7 +1161,9 @@ export default function App() {
         </main>
       </div>
 
+      {/* Modais Base */}
       {renderModal()}
+      {renderArticuladorModal()}
       
       {dialog && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animation-fade-in">
