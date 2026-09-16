@@ -66,7 +66,7 @@ export default function App() {
   const [contacts, setContacts] = useState(INITIAL_MOCK_DATA);
   const [selectedContact, setSelectedContact] = useState(null);
   
-  // Novo modal de Articulador (Assessoria)
+  // Controle do modal da Assessoria/Articulador
   const [selectedArticuladorProfile, setSelectedArticuladorProfile] = useState(null);
 
   const [isEditMode, setIsEditMode] = useState(false);
@@ -76,10 +76,10 @@ export default function App() {
   const [mapScope, setMapScope] = useState('SC');
   const [directoryViewMode, setDirectoryViewMode] = useState('grid');
   
-  // Filtros Globais e Visibilidade
+  // Novos controles de Filtro
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterPhoneStatus, setFilterPhoneStatus] = useState('Todos'); // 'Todos', 'Com Telefone', 'Sem Telefone'
+  const [filterPhoneStatus, setFilterPhoneStatus] = useState('Todos');
   
   const [filterBase, setFilterBase] = useState([]);
   const [filterTemas, setFilterTemas] = useState([]);
@@ -232,29 +232,32 @@ export default function App() {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  // Trava de segurança para evitar tela branca ao buscar números de telefone/situação
+  const safeLower = (val) => (val != null ? String(val).toLowerCase() : '');
+
   const filteredContacts = useMemo(() => {
+    const lowerSearch = safeLower(searchTerm);
+    
     return contacts.filter(contact => {
-      // Filtros MultiSelect
       const matchesBase = filterBase.length === 0 || filterBase.includes(contact.base);
       const matchesArticulador = filterArticulador.length === 0 || filterArticulador.includes(contact.articulador);
       const matchesTemas = filterTemas.length === 0 || filterTemas.includes(contact.temas);
       const matchesSituacao = filterSituacao.length === 0 || filterSituacao.includes(contact.situacao);
 
-      // Status do Telefone
-      const hasPhone = !!contact.telefone && contact.telefone.trim() !== '';
+      // Filtro de Status do Telefone
+      const hasPhone = contact.telefone && String(contact.telefone).trim() !== '';
       const matchesPhoneStatus = filterPhoneStatus === 'Todos' ? true : (filterPhoneStatus === 'Com Telefone' ? hasPhone : !hasPhone);
 
-      // Busca Universal (Nome, Local, Área, Telefone, Email, Articulador)
-      const nomeMatch = contact.lideranca?.toLowerCase().includes(searchTerm.toLowerCase());
-      const localMatch = contact.municipio_bairro?.toLowerCase().includes(searchTerm.toLowerCase());
-      const areaMatch = contact.area_de_atuacao?.toLowerCase().includes(searchTerm.toLowerCase());
-      const phoneMatch = contact.telefone?.toLowerCase().includes(searchTerm.toLowerCase());
-      const emailMatch = contact.email?.toLowerCase().includes(searchTerm.toLowerCase());
-      const artMatch = contact.articulador?.toLowerCase().includes(searchTerm.toLowerCase());
+      // Busca Universal Segura (Texto + Números)
+      const nomeMatch = safeLower(contact.lideranca).includes(lowerSearch);
+      const localMatch = safeLower(contact.municipio_bairro).includes(lowerSearch);
+      const areaMatch = safeLower(contact.area_de_atuacao).includes(lowerSearch);
+      const phoneMatch = safeLower(contact.telefone).includes(lowerSearch);
+      const emailMatch = safeLower(contact.email).includes(lowerSearch);
+      const artMatch = safeLower(contact.articulador).includes(lowerSearch);
       
       const matchesSearch = !searchTerm || nomeMatch || localMatch || areaMatch || phoneMatch || emailMatch || artMatch;
 
-      // Filtros Regionais
       const isFln = contact.base === 'Base Florianópolis';
       const isSc = contact.base === 'Base Santa Catarina';
       
@@ -376,10 +379,11 @@ export default function App() {
   const SituacaoBadge = ({ situacao }) => {
     if (!situacao) return null;
     let cor = "bg-gray-200 text-[#1A1A1A]";
-    if (situacao.includes("4 -")) cor = "bg-[#007577] text-white";
-    else if (situacao.includes("3 -")) cor = "bg-[#DCAE1D] text-[#1A1A1A]";
-    else if (situacao.includes("1 -") || situacao.includes("2 -")) cor = "bg-[#B32033] text-white";
-    else if (situacao.includes("2 -")) cor = "bg-[#F4A261] text-white"; 
+    // Conversão segura de situação para string antes de checar inclusão
+    if (String(situacao).includes("4 -")) cor = "bg-[#007577] text-white";
+    else if (String(situacao).includes("3 -")) cor = "bg-[#DCAE1D] text-[#1A1A1A]";
+    else if (String(situacao).includes("1 -") || String(situacao).includes("2 -")) cor = "bg-[#B32033] text-white";
+    else if (String(situacao).includes("2 -")) cor = "bg-[#F4A261] text-white"; 
     return <span className={`px-2 py-1 text-[10px] md:text-xs font-bold rounded-md border-[2px] ${t.border} ${cor} truncate max-w-full block`}>{situacao}</span>;
   };
 
@@ -771,17 +775,15 @@ export default function App() {
                       </div>
                       <SituacaoBadge situacao={contact.situacao} />
                     </div>
-                    
+                    {/* Articuladores interativos que abrem ficha da assessoria */}
                     <div className={`mt-auto pt-4 border-t-2 border-dashed border-gray-300 flex flex-wrap gap-2 items-center justify-between`}>
                       <div className="flex flex-col gap-1.5 max-w-[70%]">
-                        <span className={`text-[10px] md:text-xs font-bold truncate ${t.textMuted}`}>
-                          <Icon name="tag" size={12} className="inline mr-1"/>{contact.temas || 'S/ Tema'}
-                        </span>
+                        <span className={`text-[10px] md:text-xs font-bold truncate ${t.textMuted}`}><Icon name="tag" size={12} className="inline mr-1"/>{contact.temas || 'S/ Tema'}</span>
                         {contact.articulador && (
                           <button 
                             onClick={(e) => { e.stopPropagation(); setSelectedArticuladorProfile(contact.articulador); }} 
                             className={`text-[10px] md:text-xs font-black truncate text-[#007577] hover:underline bg-[#EAEAEA] px-1.5 py-0.5 rounded border border-gray-300 flex items-center w-fit max-w-full`}
-                            title="Ver dashboard desta assessoria"
+                            title="Ver ficha desta assessoria"
                           >
                             <Icon name="usercheck" size={12} className="inline mr-1 shrink-0"/> <span className="truncate">{contact.articulador}</span>
                           </button>
@@ -820,7 +822,7 @@ export default function App() {
                        <button 
                           onClick={(e) => { e.stopPropagation(); setSelectedArticuladorProfile(contact.articulador); }} 
                           className={`text-xs font-black truncate flex items-center gap-1 text-[#007577] hover:underline bg-[#EAEAEA] px-1.5 py-0.5 rounded border border-gray-300 w-full`}
-                          title="Ver dashboard desta assessoria"
+                          title="Ver ficha desta assessoria"
                        >
                           <Icon name="usercheck" size={14} className="shrink-0" /> <span className="truncate">{contact.articulador}</span>
                        </button>
@@ -998,7 +1000,7 @@ export default function App() {
                   <div className="space-y-4">
                     {selectedContact.articulador && (
                       <div>
-                        <label className="text-[10px] md:text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">Articulador(a) / Assessoria</label>
+                        <label className="text-[10px] md:text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">Articulador(a)</label>
                         <button 
                           onClick={() => { setSelectedContact(null); setSelectedArticuladorProfile(selectedContact.articulador); }} 
                           className={`font-bold flex items-center gap-2 text-base md:text-lg text-[#007577] hover:underline bg-[#EAEAEA] px-2 py-1 rounded-md border border-gray-300 w-fit transition-colors`}
@@ -1036,7 +1038,7 @@ export default function App() {
     
     // Todos os contatos da base correspondentes àquela assessoria
     const articuladorContacts = contacts.filter(c => c.articulador === selectedArticuladorProfile);
-    const withPhone = articuladorContacts.filter(c => c.telefone && c.telefone.trim() !== '').length;
+    const withPhone = articuladorContacts.filter(c => c.telefone && String(c.telefone).trim() !== '').length;
     const withoutPhone = articuladorContacts.length - withPhone;
 
     return (
@@ -1085,10 +1087,10 @@ export default function App() {
                             <SituacaoBadge situacao={c.situacao} />
                          </td>
                          <td className="p-3 md:p-4">
-                            {c.telefone && c.telefone.trim() !== '' ? (
+                            {c.telefone && String(c.telefone).trim() !== '' ? (
                                <span className="font-black text-sm text-[#007577] bg-[#007577]/10 border border-[#007577]/20 px-2 py-1 rounded block w-fit">{c.telefone}</span>
                             ) : (
-                               <span className="font-black text-xs text-[#B32033] bg-[#B32033]/10 border border-[#B32033]/20 px-2 py-1 rounded block w-fit">Sem Número Cadastrado</span>
+                               <span className="font-black text-xs text-[#B32033] bg-[#B32033]/10 border border-[#B32033]/20 px-2 py-1 rounded block w-fit">Sem Número</span>
                             )}
                          </td>
                          <td className="p-3 md:p-4 text-center">
@@ -1161,7 +1163,6 @@ export default function App() {
         </main>
       </div>
 
-      {/* Modais Base */}
       {renderModal()}
       {renderArticuladorModal()}
       
